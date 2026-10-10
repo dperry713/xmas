@@ -391,3 +391,40 @@ export const ADVENT_DAYS: AdventDay[] = [
     piazzaAwakening: "The Star of Bethlehem blazes atop the tree! The entire 3D Piazza is in full radiant celebration!"
   }
 ];
+
+import { DAY_TRANSLATIONS } from './adventDaysI18n';
+
+/**
+ * Returns a localized AdventDay object for a given day and language code.
+ * Falls back to English if the language or day is not translated.
+ */
+export function getLocalizedAdventDay(dayNumber: number, lang: string = 'en'): AdventDay {
+  const baseDay = ADVENT_DAYS.find(d => d.day === dayNumber) || ADVENT_DAYS[0];
+  const langKey = lang.toLowerCase().split('-')[0];
+  const langDict = DAY_TRANSLATIONS[langKey];
+  const translated = langDict ? langDict[dayNumber] : undefined;
+
+  if (!translated) {
+    return baseDay;
+  }
+
+  return {
+    ...baseDay,
+    theme: translated.theme || baseDay.theme,
+    location: translated.location || baseDay.location,
+    dateLabel: translated.dateLabel || baseDay.dateLabel,
+    scripture: translated.scripture || baseDay.scripture,
+    reflection: translated.reflection || baseDay.reflection,
+    activity: translated.activity || baseDay.activity,
+    piazzaAwakening: translated.piazzaAwakening || baseDay.piazzaAwakening,
+    goDeeperLabel: translated.goDeeperLabel || baseDay.goDeeperLabel
+  };
+}
+
+/**
+ * Returns all 24 AdventDay objects localized for the specified language.
+ */
+export function getLocalizedAdventDays(lang: string = 'en'): AdventDay[] {
+  return ADVENT_DAYS.map(d => getLocalizedAdventDay(d.day, lang));
+}
+

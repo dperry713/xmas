@@ -4,7 +4,7 @@
  * "Go Deeper" church links, and "Complete & Awaken Piazza" button.
  */
 
-import { ADVENT_DAYS } from '../data/adventDays';
+import { getLocalizedAdventDay } from '../data/adventDays';
 import { dateGate } from '../services/dateGate';
 import { storage } from '../services/storage';
 import { t } from '../data/translations';
@@ -89,7 +89,7 @@ export class DayModal {
   }
 
   open(dayNumber: number): void {
-    const data = ADVENT_DAYS.find(d => d.day === dayNumber);
+    const data = getLocalizedAdventDay(dayNumber, storage.getLanguage());
     if (!data) return;
 
     this.currentDay = dayNumber;
@@ -128,7 +128,7 @@ export class DayModal {
 
   public refresh(): void {
     if (!this.isOpen || !this.currentDay) return;
-    const data = ADVENT_DAYS.find(d => d.day === this.currentDay);
+    const data = getLocalizedAdventDay(this.currentDay, storage.getLanguage());
     if (data) {
       this.renderContent(data);
     }

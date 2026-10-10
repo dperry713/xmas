@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
-import { ADVENT_DAYS } from '../data/adventDays';
+import { ADVENT_DAYS, getLocalizedAdventDay, getLocalizedAdventDays } from '../data/adventDays';
 import { dateGate } from '../services/dateGate';
 import { storage } from '../services/storage';
 import { t } from '../data/translations';
@@ -291,7 +291,17 @@ export class PiazzaScene3D {
   }
 
   /**
-   * KTX2 / Compressed Texture Pipeline loader with automatic JPEG/PNG fallback
+   * Registry of compiled .ktx2 assets verified in the deployment bundle.
+   * Only assets in this set will be requested via KTX2Loader,
+   * completely eliminating 404 requests for nonexistent compressed variants.
+   */
+  private static readonly AVAILABLE_KTX2_VARIANTS = new Set<string>([
+    // Populate when .ktx2 variants are compiled via scripts/compress-textures.js
+  ]);
+
+  /**
+   * Texture loader with KTX2 support only when compressed variant exists,
+   * otherwise cleanly loads high-resolution standard textures with zero 404 requests.
    */
   private loadTextureWithKTX2Fallback(
     standardPath: string,
@@ -305,7 +315,9 @@ export class PiazzaScene3D {
       tex.repeat.set(repeat.x, repeat.y);
     }
 
-    if (this.ktx2Loader) {
+    // Only query KTX2Loader if the compressed variant genuinely exists
+    const filename = standardPath.split('/').pop()?.replace(/\.(jpe?g|png)$/i, '.ktx2');
+    if (this.ktx2Loader && filename && PiazzaScene3D.AVAILABLE_KTX2_VARIANTS.has(filename)) {
       const ktx2Path = standardPath.replace(/\.(jpe?g|png)$/i, '.ktx2');
       this.ktx2Loader.load(
         ktx2Path,
@@ -321,8 +333,8 @@ export class PiazzaScene3D {
           }
         },
         undefined,
-        () => {
-          // Fallback seamlessly retained via standard TextureLoader
+        (err) => {
+          console.warn(`KTX2 load failed for ${ktx2Path}, falling back to standard:`, err);
         }
       );
     }
@@ -910,7 +922,7 @@ export class PiazzaScene3D {
 
     const lang = storage.getLanguage();
 
-    ADVENT_DAYS.forEach((data) => {
+    getLocalizedAdventDays(lang).forEach((data) => {
       const status = dateGate.getDayStatus(data.day);
       const isToday = dateGate.isToday(data.day);
 
@@ -924,7 +936,7 @@ export class PiazzaScene3D {
       if (status === 'available') statusText = isToday ? t('todayBadge', lang) : t('statusAvailable', lang);
       if (status === 'completed') statusText = t('statusCompleted', lang);
 
-      badge.setAttribute('aria-label', `Day ${data.day}: ${data.theme}. Status: ${statusText}. Location: ${data.location}`);
+      badge.setAttribute('aria-label', `${t('day', lang)} ${data.day}: ${data.theme}. ${t('status', lang)}: ${statusText}. ${t('location', lang)}: ${data.location}`);
 
       badge.innerHTML = `
         <div class="pin-halo" aria-hidden="true"></div>
@@ -934,7 +946,7 @@ export class PiazzaScene3D {
           ${status === 'completed' ? '<span class="pin-icon">⭐</span>' : ''}
         </div>
         <div class="pin-tooltip" aria-hidden="true">
-          <span class="pin-tip-day">Day ${data.day} · ${data.dateLabel}</span>
+          <span class="pin-tip-day">${t('day', lang)} ${data.day} · ${data.dateLabel}</span>
           <span class="pin-tip-title">${data.theme}</span>
           <span class="pin-tip-loc">${data.location}</span>
           <span class="pin-tip-status status-${status}">${statusText}</span>
@@ -1367,7 +1379,7 @@ export class PiazzaScene3D {
         <div class="piazza-2d-canvas-wrapper">
           <img src="${base}assets/piazza_master.jpg" alt="Illustrated European Advent Piazza Square" class="piazza-2d-master-img" />
           <div class="piazza-2d-hotspots-overlay" id="piazza2dHotspotsOverlay" role="group" aria-label="Advent Day Hotspots">
-            ${ADVENT_DAYS.map((item) => {
+            ${getLocalizedAdventDays(lang).map((item) => {
               const status = dateGate.getDayStatus(item.day);
               const isToday = dateGate.isToday(item.day);
               const isUnlocked = status !== 'locked';
@@ -1419,7 +1431,7 @@ export class PiazzaScene3D {
     this.container.querySelectorAll('.piazza-2d-pin').forEach((btnEl) => {
       const btn = btnEl as HTMLElement;
       const day = parseInt(btn.dataset.day || '1', 10);
-      const item = ADVENT_DAYS[day - 1];
+      const item = getLocalizedAdventDay(day, lang);
       if (!item) return;
 
       const status = dateGate.getDayStatus(day);

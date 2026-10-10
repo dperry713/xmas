@@ -4,7 +4,7 @@
  * with statuses, keyboard navigation, and quick access.
  */
 
-import { ADVENT_DAYS } from '../data/adventDays';
+import { getLocalizedAdventDays } from '../data/adventDays';
 import { dateGate } from '../services/dateGate';
 import { storage } from '../services/storage';
 import { t } from '../data/translations';
@@ -146,7 +146,7 @@ export class CalendarDrawer {
         </header>
 
         <div class="drawer-grid" role="list">
-          ${ADVENT_DAYS.map((item) => {
+          ${getLocalizedAdventDays(lang).map((item) => {
             const status = dateGate.getDayStatus(item.day);
             const isToday = dateGate.isToday(item.day);
             const isUnlocked = status !== 'locked';

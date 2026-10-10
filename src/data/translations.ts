@@ -11,25 +11,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
   { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-  { code: 'pt', name: 'Português', flag: '🇵🇹' },
-  { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
-  { code: 'pl', name: 'Polski', flag: '🇵🇱' },
-  { code: 'sv', name: 'Svenska', flag: '🇸🇪' },
-  { code: 'no', name: 'Norsk', flag: '🇳🇴' },
-  { code: 'da', name: 'Dansk', flag: '🇩🇰' },
-  { code: 'fi', name: 'Suomi', flag: '🇫🇮' },
-  { code: 'el', name: 'Ελληνικά', flag: '🇬🇷' },
-  { code: 'hu', name: 'Magyar', flag: '🇭🇺' },
-  { code: 'cs', name: 'Čeština', flag: '🇨🇿' },
-  { code: 'ro', name: 'Română', flag: '🇷🇴' },
-  { code: 'sk', name: 'Slovenčina', flag: '🇸🇰' },
-  { code: 'hr', name: 'Hrvatski', flag: '🇭🇷' },
-  { code: 'bg', name: 'Български', flag: '🇧🇬' },
-  { code: 'lt', name: 'Lietuvių', flag: '🇱🇹' },
-  { code: 'lv', name: 'Latviešu', flag: '🇱🇻' },
-  { code: 'et', name: 'Eesti', flag: '🇪🇪' },
-  { code: 'ga', name: 'Gaeilge', flag: '🇮🇪' },
-  { code: 'mt', name: 'Malti', flag: '🇲🇹' }
+  { code: 'pt', name: 'Português', flag: '🇵🇹' }
 ];
 
 export const TRANSLATIONS: Record<string, TranslationDictionary> = {

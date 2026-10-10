@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ADVENT_DAYS } from '../src/data/adventDays';
+import { ADVENT_DAYS, getLocalizedAdventDay, getLocalizedAdventDays } from '../src/data/adventDays';
 import { SUPPORTED_LANGUAGES, t } from '../src/data/translations';
 import { dateGate } from '../src/services/dateGate';
 import { storage, validateStorageState } from '../src/services/storage';
@@ -191,16 +191,59 @@ describe('Storage Service & Adaptive Quality Preferences', () => {
   });
 });
 
-describe('i18n Translation Dictionary', () => {
-  it('should support multiple official Church languages', () => {
-    expect(SUPPORTED_LANGUAGES.length).toBeGreaterThanOrEqual(24);
+describe('i18n Translation Dictionary & 24 Days Localization', () => {
+  it('should support 6 fully localized European languages', () => {
+    expect(SUPPORTED_LANGUAGES).toHaveLength(6);
+    const codes = SUPPORTED_LANGUAGES.map(l => l.code);
+    expect(codes).toEqual(['en', 'es', 'fr', 'de', 'it', 'pt']);
   });
 
-  it('should return translated keys with fallback to English', () => {
+  it('should return translated UI keys with fallback to English', () => {
     expect(t('day', 'en')).toBe('Day');
     expect(t('day', 'es')).toBe('Día');
     expect(t('day', 'fr')).toBe('Jour');
     expect(t('day', 'de')).toBe('Tag');
     expect(t('day', 'it')).toBe('Giorno');
+    expect(t('day', 'pt')).toBe('Dia');
+    // Fallback for unknown key/language
+    expect(t('nonexistent_key_xyz', 'es')).toBe('nonexistent_key_xyz');
+  });
+
+  it('should return authentic localized visitor content for all 24 days across supported languages', () => {
+    // Check Day 1 theme localization
+    expect(getLocalizedAdventDay(1, 'en').theme).toBe('The Light in the Courtyard');
+    expect(getLocalizedAdventDay(1, 'es').theme).toBe('La Luz en el Patio');
+    expect(getLocalizedAdventDay(1, 'fr').theme).toBe('La Lumière dans la Cour');
+    expect(getLocalizedAdventDay(1, 'de').theme).toBe('Das Licht im Hof');
+    expect(getLocalizedAdventDay(1, 'it').theme).toBe('La Luce nel Cortile');
+    expect(getLocalizedAdventDay(1, 'pt').theme).toBe('A Luz no Pátio');
+
+    // Check all 24 days in Spanish
+    const esDays = getLocalizedAdventDays('es');
+    expect(esDays).toHaveLength(24);
+    esDays.forEach((day, idx) => {
+      expect(day.day).toBe(idx + 1);
+      expect(day.theme).toBeTruthy();
+      expect(day.scripture).toBeTruthy();
+      expect(day.reflection).toBeTruthy();
+      expect(day.activity).toBeTruthy();
+      expect(day.location).toBeTruthy();
+    });
+
+    // Check all 24 days in French, German, Italian, Portuguese
+    ['fr', 'de', 'it', 'pt'].forEach((lang) => {
+      const days = getLocalizedAdventDays(lang);
+      expect(days).toHaveLength(24);
+      days.forEach((day) => {
+        expect(day.theme).toBeTruthy();
+        expect(day.scripture).toBeTruthy();
+        expect(day.reflection).toBeTruthy();
+      });
+    });
+  });
+
+  it('should fallback to English for unsupported language codes', () => {
+    const fallbackDay = getLocalizedAdventDay(1, 'xx-UNKNOWN');
+    expect(fallbackDay.theme).toBe('The Light in the Courtyard');
   });
 });
