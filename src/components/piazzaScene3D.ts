@@ -36,7 +36,11 @@ export class PiazzaScene3D {
   // Textures
   private textureLoader!: THREE.TextureLoader;
   private cobbleTex!: THREE.Texture;
+  private cobbleNormalTex!: THREE.Texture;
   private cathedralTex!: THREE.Texture;
+  private cathedralNormalTex!: THREE.Texture;
+  private roseWindowTex!: THREE.Texture;
+  private roseMesh: THREE.Mesh | null = null;
   private townhousesTex!: THREE.Texture;
   private skyTex!: THREE.Texture;
 
@@ -221,11 +225,16 @@ export class PiazzaScene3D {
       ? import.meta.env.BASE_URL
       : import.meta.env.BASE_URL + '/';
 
-    // Cobblestone pavement (supports KTX2 with JPG fallback)
+    // Cobblestone pavement & normal map (supports KTX2 with JPG fallback)
     this.cobbleTex = this.loadTextureWithKTX2Fallback(base + 'assets/cobblestones.jpg', { x: 28, y: 28 });
+    this.cobbleNormalTex = this.loadTextureWithKTX2Fallback(base + 'assets/cobblestones_normal.jpg', { x: 28, y: 28 });
 
-    // Cathedral Gothic Facade
+    // Cathedral Gothic Facade & architectural relief normal map
     this.cathedralTex = this.loadTextureWithKTX2Fallback(base + 'assets/cathedral_facade.jpg');
+    this.cathedralNormalTex = this.loadTextureWithKTX2Fallback(base + 'assets/cathedral_normal.jpg');
+
+    // Gothic Stained Glass Rose Window
+    this.roseWindowTex = this.loadTextureWithKTX2Fallback(base + 'assets/rose_window.jpg');
 
     // Historic Townhouses
     this.townhousesTex = this.loadTextureWithKTX2Fallback(base + 'assets/townhouses_facade.jpg', { x: 2, y: 1 });
@@ -279,12 +288,14 @@ export class PiazzaScene3D {
     this.skyMesh.rotation.y = -Math.PI / 1.8;
     this.scene.add(this.skyMesh);
 
-    // 2. Base Cobblestone Piazza Ground Plane
+    // 2. Base Cobblestone Piazza Ground Plane with Tangent Space Normal Map
     const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
       map: this.cobbleTex,
-      roughness: 0.65,
-      metalness: 0.25,
+      normalMap: this.cobbleNormalTex,
+      normalScale: new THREE.Vector2(0.85, 0.85),
+      roughness: 0.55,
+      metalness: 0.2,
       color: 0xcccccc
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -325,7 +336,9 @@ export class PiazzaScene3D {
     const bodyGeo = new THREE.BoxGeometry(44, 48, 20);
     const bodyMat = new THREE.MeshStandardMaterial({
       map: this.cathedralTex,
-      roughness: 0.75,
+      normalMap: this.cathedralNormalTex,
+      normalScale: new THREE.Vector2(0.75, 0.75),
+      roughness: 0.72,
       metalness: 0.15
     });
     const catBody = new THREE.Mesh(bodyGeo, bodyMat);
@@ -334,25 +347,95 @@ export class PiazzaScene3D {
     catBody.receiveShadow = true;
     catGroup.add(catBody);
 
-    const spireGeo = new THREE.ConeGeometry(5.5, 26, 8);
-    const spireMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+    // Gothic Central Gable Pediment
+    const pedimentGeo = new THREE.ConeGeometry(24, 12, 4);
+    const pedimentMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+    const pediment = new THREE.Mesh(pedimentGeo, pedimentMat);
+    pediment.rotation.y = Math.PI / 4;
+    pediment.position.set(0, 52, 0);
+    pediment.scale.set(1, 1, 0.4);
+    catGroup.add(pediment);
+
+    // Left and Right Spires with Finials & Pinnacles
+    const spireGeo = new THREE.ConeGeometry(5.5, 28, 8);
+    const spireMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.55 });
 
     const leftSpire = new THREE.Mesh(spireGeo, spireMat);
-    leftSpire.position.set(-18, 60, 0);
+    leftSpire.position.set(-18, 62, 0);
+    leftSpire.castShadow = true;
     catGroup.add(leftSpire);
 
     const rightSpire = new THREE.Mesh(spireGeo, spireMat);
-    rightSpire.position.set(18, 60, 0);
+    rightSpire.position.set(18, 62, 0);
+    rightSpire.castShadow = true;
     catGroup.add(rightSpire);
+
+    // Spire corner crockets / pinnacles
+    const pinGeo = new THREE.ConeGeometry(0.9, 6, 4);
+    const pinMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 });
+    const towerOffsets = [-18, 18];
+    towerOffsets.forEach((tx) => {
+      [[-4.5, -4.5], [4.5, -4.5], [-4.5, 4.5], [4.5, 4.5]].forEach(([px, pz]) => {
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.set(tx + px, 51, pz);
+        catGroup.add(pin);
+      });
+    });
+
+    // Flying Buttresses on Left & Right Flanks
+    const buttressMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+    for (let z = -6; z <= 6; z += 6) {
+      const lb = new THREE.Mesh(new THREE.BoxGeometry(1.6, 22, 1.8), buttressMat);
+      lb.position.set(-26, 16, z);
+      lb.rotation.z = -0.22;
+      lb.castShadow = true;
+      catGroup.add(lb);
+
+      const rb = new THREE.Mesh(new THREE.BoxGeometry(1.6, 22, 1.8), buttressMat);
+      rb.position.set(26, 16, z);
+      rb.rotation.z = 0.22;
+      rb.castShadow = true;
+      catGroup.add(rb);
+    }
+
+    // Grand Entrance Portal Porch (Deep Recessed Gothic Arch)
+    const portalPorchGeo = new THREE.BoxGeometry(14, 12, 5);
+    const portalPorchMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.75 });
+    const portalPorch = new THREE.Mesh(portalPorchGeo, portalPorchMat);
+    portalPorch.position.set(0, 6, 12.5);
+    portalPorch.castShadow = true;
+    portalPorch.receiveShadow = true;
+    catGroup.add(portalPorch);
+
+    const doorGeo = new THREE.BoxGeometry(8, 9, 0.4);
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x1f140e, roughness: 0.9 });
+    const doors = new THREE.Mesh(doorGeo, doorMat);
+    doors.position.set(0, 4.5, 15.1);
+    catGroup.add(doors);
+
+    // Stained Glass Rose Window (Day 8 Awakening)
+    const roseGeo = new THREE.CircleGeometry(7.2, 32);
+    const roseMat = new THREE.MeshStandardMaterial({
+      map: this.roseWindowTex,
+      emissive: new THREE.Color(0xf59e0b),
+      emissiveMap: this.roseWindowTex,
+      emissiveIntensity: 0.08,
+      roughness: 0.25,
+      metalness: 0.1,
+      side: THREE.FrontSide
+    });
+    this.roseMesh = new THREE.Mesh(roseGeo, roseMat);
+    this.roseMesh.position.set(0, 27, 10.2);
+    catGroup.add(this.roseMesh);
 
     // Internal Rose Window illumination
     this.roseLight = new THREE.PointLight(0xfcd34d, 0, 50, 1.4);
-    this.roseLight.position.set(0, 26, 11);
+    this.roseLight.position.set(0, 27, 12);
     catGroup.add(this.roseLight);
 
-    // Cathedral Grand Portal
+    // Cathedral Grand Portal Light
     this.portalLight = new THREE.PointLight(0xf59e0b, 0, 40, 1.2);
-    this.portalLight.position.set(0, 4, 11);
+    this.portalLight.position.set(0, 5, 14);
     catGroup.add(this.portalLight);
 
     this.scene.add(catGroup);
@@ -376,13 +459,34 @@ export class PiazzaScene3D {
     leftMesh.receiveShadow = true;
     leftGroup.add(leftMesh);
 
+    // Covered Ground-Floor Colonnade / Arcade
+    const arcadeMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+    for (let x = -30; x <= 30; x += 12) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 8, 1.6), arcadeMat);
+      pillar.position.set(x, 4, 9);
+      pillar.castShadow = true;
+      leftGroup.add(pillar);
+
+      const lantern = new THREE.PointLight(0xfbbf24, 0.45, 10, 1.8);
+      lantern.position.set(x, 6, 8);
+      leftGroup.add(lantern);
+    }
+
     const roofGeo = new THREE.ConeGeometry(9, 10, 4);
     const roofMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
+    const chimneyGeo = new THREE.BoxGeometry(2, 4.5, 2);
+    const chimneyMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 });
+
     for (let x = -28; x <= 28; x += 14) {
       const gabledRoof = new THREE.Mesh(roofGeo, roofMat);
       gabledRoof.position.set(x, 29, 0);
       gabledRoof.rotation.y = Math.PI / 4;
       leftGroup.add(gabledRoof);
+
+      const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+      chimney.position.set(x + 2, 32, -3);
+      chimney.castShadow = true;
+      leftGroup.add(chimney);
     }
     this.scene.add(leftGroup);
 
@@ -397,11 +501,27 @@ export class PiazzaScene3D {
     rightMesh.receiveShadow = true;
     rightGroup.add(rightMesh);
 
+    for (let x = -30; x <= 30; x += 12) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 8, 1.6), arcadeMat);
+      pillar.position.set(x, 4, 9);
+      pillar.castShadow = true;
+      rightGroup.add(pillar);
+
+      const lantern = new THREE.PointLight(0xfbbf24, 0.45, 10, 1.8);
+      lantern.position.set(x, 6, 8);
+      rightGroup.add(lantern);
+    }
+
     for (let x = -28; x <= 28; x += 14) {
       const gabledRoof = new THREE.Mesh(roofGeo, roofMat);
       gabledRoof.position.set(x, 29, 0);
       gabledRoof.rotation.y = Math.PI / 4;
       rightGroup.add(gabledRoof);
+
+      const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+      chimney.position.set(x + 2, 32, -3);
+      chimney.castShadow = true;
+      rightGroup.add(chimney);
     }
     this.scene.add(rightGroup);
   }
@@ -464,10 +584,20 @@ export class PiazzaScene3D {
       deactivate: () => ciderStall.setVisible(false)
     });
 
-    // Day 8: Cathedral Rose Window
+    // Day 8: Cathedral Rose Window (Stained Glass Illumination)
     this.awakenedObjects.set(8, {
-      activate: () => { this.roseLight.intensity = 3.5; },
-      deactivate: () => { this.roseLight.intensity = 0; }
+      activate: () => {
+        this.roseLight.intensity = 3.8;
+        if (this.roseMesh) {
+          (this.roseMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 2.2;
+        }
+      },
+      deactivate: () => {
+        this.roseLight.intensity = 0;
+        if (this.roseMesh) {
+          (this.roseMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.08;
+        }
+      }
     });
 
     // Day 11: The Grand Evergreen Christmas Tree
@@ -1192,7 +1322,10 @@ export class PiazzaScene3D {
 
     // Textures disposal
     this.cobbleTex?.dispose();
+    this.cobbleNormalTex?.dispose();
     this.cathedralTex?.dispose();
+    this.cathedralNormalTex?.dispose();
+    this.roseWindowTex?.dispose();
     this.townhousesTex?.dispose();
     this.skyTex?.dispose();
 

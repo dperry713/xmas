@@ -91,6 +91,16 @@ xmas/
 
 ---
 
+## 🌐 Public Demo & Deployment
+
+| Environment | URL / Command | Notes |
+| :--- | :--- | :--- |
+| **Public Live Demo (GitHub Pages)** | [https://dperry713.github.io/xmas/](https://dperry713.github.io/xmas/) | Auto-deployed via GitHub Actions on push to `main` |
+| **Local Development** | `npm run dev` → `http://localhost:5173/` | Hot Module Replacement (HMR) with Vite |
+| **Production Preview** | `npm run preview` → `http://localhost:4173/` | Validates compiled static distribution bundle |
+
+---
+
 ## 🚀 Quick Start & Development
 
 ```bash
@@ -108,6 +118,12 @@ npm run typecheck
 
 # Build production bundle
 npm run build
+
+# Preview production build locally
+npm run preview
+
+# Optional: Compress textures to KTX2 / Basis Universal
+npm run compress-textures
 ```
 
 ---
@@ -117,7 +133,7 @@ npm run build
 Embed into any Church CMS page using standard responsive iframe:
 ```html
 <iframe 
-  src="https://advent.church.org/?embedded=true" 
+  src="https://dperry713.github.io/xmas/?embedded=true" 
   title="The Advent Piazza Interactive Experience" 
   width="100%" 
   height="750" 
@@ -125,7 +141,7 @@ Embed into any Church CMS page using standard responsive iframe:
   allow="autoplay"
 ></iframe>
 ```
-Appending `?embedded=true` automatically streamlines the header padding for embedded environments.
+Appending `?embedded=true` automatically streamlines the header padding and layout for embedded environments.
 
 ---
 
