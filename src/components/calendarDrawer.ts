@@ -4,22 +4,26 @@
  * with statuses, keyboard navigation, and quick access.
  */
 
-import { ADVENT_DAYS } from '../data/adventDays.js';
-import { dateGate } from '../services/dateGate.js';
-import { storage } from '../services/storage.js';
-import { t } from '../data/translations.js';
-import { soundManager } from '../audio/soundManager.js';
+import { ADVENT_DAYS } from '../data/adventDays';
+import { dateGate } from '../services/dateGate';
+import { storage } from '../services/storage';
+import { t } from '../data/translations';
+import { soundManager } from '../audio/soundManager';
 
 export class CalendarDrawer {
-  constructor({ container, onSelectDay }) {
+  private container: HTMLElement;
+  private onSelectDay: (day: number) => void;
+  public isOpen: boolean = false;
+  private drawerEl!: HTMLDivElement;
+
+  constructor({ container, onSelectDay }: { container: HTMLElement; onSelectDay: (day: number) => void }) {
     this.container = container;
     this.onSelectDay = onSelectDay;
-    this.isOpen = false;
 
     this.render();
   }
 
-  render() {
+  private render(): void {
     this.drawerEl = document.createElement('div');
     this.drawerEl.className = 'calendar-drawer-overlay';
     this.drawerEl.id = 'calendarDrawerOverlay';
@@ -36,7 +40,7 @@ export class CalendarDrawer {
     });
   }
 
-  open() {
+  open(): void {
     this.renderContent();
     this.drawerEl.classList.add('is-open');
     this.drawerEl.setAttribute('aria-hidden', 'false');
@@ -45,11 +49,11 @@ export class CalendarDrawer {
     soundManager.playClick();
 
     setTimeout(() => {
-      /** @type {HTMLElement|null} */ (this.drawerEl.querySelector('.drawer-close-btn'))?.focus();
+      (this.drawerEl.querySelector('.drawer-close-btn') as HTMLElement | null)?.focus();
     }, 50);
   }
 
-  close() {
+  close(): void {
     if (!this.isOpen) return;
     this.drawerEl.classList.remove('is-open');
     this.drawerEl.setAttribute('aria-hidden', 'true');
@@ -58,7 +62,7 @@ export class CalendarDrawer {
     soundManager.playClick();
   }
 
-  toggle() {
+  toggle(): void {
     if (this.isOpen) {
       this.close();
     } else {
@@ -66,7 +70,7 @@ export class CalendarDrawer {
     }
   }
 
-  renderContent() {
+  renderContent(): void {
     const lang = storage.getLanguage();
     const completedDays = storage.getCompletedDays();
 
@@ -131,7 +135,7 @@ export class CalendarDrawer {
     });
 
     this.drawerEl.querySelectorAll('.card-open-btn:not([disabled])').forEach((btnEl) => {
-      const btn = /** @type {HTMLElement} */ (btnEl);
+      const btn = btnEl as HTMLElement;
       btn.addEventListener('click', () => {
         const day = parseInt(btn.dataset.day || '1', 10);
         this.close();

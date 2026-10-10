@@ -1,26 +1,32 @@
 /**
  * Storage Service
- * Handles saving and retrieving completed days, sound preferences, and language
- * with in-memory fallback for sandboxed iframes or private browsing.
+ * Handles saving and retrieving completed days, preferences, language, and quality settings.
  */
+
+import type { StorageState, QualityLevel } from '../types/advent';
 
 const STORAGE_KEY = 'advent_piazza_v1';
 
 class StorageService {
+  private memoryStore: StorageState;
+  private isLocalStorageAvailable: boolean;
+  private listeners = new Set<(state: StorageState) => void>();
+
   constructor() {
     this.memoryStore = {
-      completedDays: [1], // Day 1 completed by default for welcoming experience
+      completedDays: [1],
       visitedDays: [1],
       soundEnabled: true,
       lang: 'en',
       simulatedDay: null,
-      unlockAll: false
+      unlockAll: false,
+      qualityLevel: 'auto'
     };
     this.isLocalStorageAvailable = this.checkAvailability();
     this.load();
   }
 
-  checkAvailability() {
+  private checkAvailability(): boolean {
     try {
       const testKey = '__advent_test__';
       window.localStorage.setItem(testKey, testKey);
@@ -31,7 +37,7 @@ class StorageService {
     }
   }
 
-  load() {
+  private load(): void {
     if (!this.isLocalStorageAvailable) return;
     try {
       const data = window.localStorage.getItem(STORAGE_KEY);
@@ -44,7 +50,7 @@ class StorageService {
     }
   }
 
-  save() {
+  private save(): void {
     if (!this.isLocalStorageAvailable) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.memoryStore));
@@ -53,15 +59,15 @@ class StorageService {
     }
   }
 
-  getCompletedDays() {
+  getCompletedDays(): number[] {
     return [...(this.memoryStore.completedDays || [])];
   }
 
-  isDayCompleted(day) {
+  isDayCompleted(day: number): boolean {
     return (this.memoryStore.completedDays || []).includes(day);
   }
 
-  markDayCompleted(day) {
+  markDayCompleted(day: number): void {
     const set = new Set(this.memoryStore.completedDays || []);
     set.add(day);
     this.memoryStore.completedDays = Array.from(set).sort((a, b) => a - b);
@@ -70,84 +76,93 @@ class StorageService {
     this.notify();
   }
 
-  unmarkDayCompleted(day) {
+  unmarkDayCompleted(day: number): void {
     this.memoryStore.completedDays = (this.memoryStore.completedDays || []).filter(d => d !== day);
     this.save();
     this.notify();
   }
 
-  markDayVisited(day) {
+  markDayVisited(day: number): void {
     const set = new Set(this.memoryStore.visitedDays || []);
     set.add(day);
     this.memoryStore.visitedDays = Array.from(set);
     this.save();
   }
 
-  isDayVisited(day) {
+  isDayVisited(day: number): boolean {
     return (this.memoryStore.visitedDays || []).includes(day);
   }
 
-  getSoundEnabled() {
+  getSoundEnabled(): boolean {
     return this.memoryStore.soundEnabled !== false;
   }
 
-  setSoundEnabled(enabled) {
+  setSoundEnabled(enabled: boolean): void {
     this.memoryStore.soundEnabled = !!enabled;
     this.save();
     this.notify();
   }
 
-  getLanguage() {
+  getLanguage(): string {
     return this.memoryStore.lang || 'en';
   }
 
-  setLanguage(lang) {
+  setLanguage(lang: string): void {
     this.memoryStore.lang = lang;
     this.save();
     this.notify();
   }
 
-  getSimulatedDay() {
+  getSimulatedDay(): number | null {
     return this.memoryStore.simulatedDay;
   }
 
-  setSimulatedDay(day) {
+  setSimulatedDay(day: number | null): void {
     this.memoryStore.simulatedDay = day;
     this.save();
     this.notify();
   }
 
-  getUnlockAll() {
+  getUnlockAll(): boolean {
     return !!this.memoryStore.unlockAll;
   }
 
-  setUnlockAll(unlock) {
+  setUnlockAll(unlock: boolean): void {
     this.memoryStore.unlockAll = !!unlock;
     this.save();
     this.notify();
   }
 
-  resetAll() {
+  getQualityLevel(): QualityLevel {
+    return this.memoryStore.qualityLevel || 'auto';
+  }
+
+  setQualityLevel(level: QualityLevel): void {
+    this.memoryStore.qualityLevel = level;
+    this.save();
+    this.notify();
+  }
+
+  resetAll(): void {
     this.memoryStore = {
       completedDays: [],
       visitedDays: [],
       soundEnabled: true,
       lang: this.getLanguage(),
       simulatedDay: null,
-      unlockAll: false
+      unlockAll: false,
+      qualityLevel: 'auto'
     };
     this.save();
     this.notify();
   }
 
-  listeners = new Set();
-
-  subscribe(listener) {
+  subscribe(listener: (state: StorageState) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  notify() {
+  private notify(): void {
     for (const listener of this.listeners) {
       try {
         listener(this.memoryStore);

@@ -1,39 +1,51 @@
 /**
- * The Advent Piazza — Main Application Coordinator
+ * The Advent Piazza — Main Application Coordinator (TypeScript)
+ * Coordinates the 3D scene engine, modal dialogues, drawer navigation,
+ * studio controls, audio synthesizer, and localized state persistence.
  */
 
-import { PiazzaScene3D } from './components/piazzaScene3D.js';
-import { DayModal } from './components/dayModal.js';
-import { CalendarDrawer } from './components/calendarDrawer.js';
-import { StudioBar } from './components/studioBar.js';
-import { storage } from './services/storage.js';
-import { dateGate } from './services/dateGate.js';
-import { t } from './data/translations.js';
-import { soundManager } from './audio/soundManager.js';
+import { PiazzaScene3D } from './components/piazzaScene3D';
+import { DayModal } from './components/dayModal';
+import { CalendarDrawer } from './components/calendarDrawer';
+import { StudioBar } from './components/studioBar';
+import { storage } from './services/storage';
+import { dateGate } from './services/dateGate';
+import { t } from './data/translations';
+import { soundManager } from './audio/soundManager';
 
-class AdventApp {
+export class AdventApp {
+  private dayModal!: DayModal;
+  private calendarDrawer!: CalendarDrawer;
+  private piazzaScene!: PiazzaScene3D;
+  private studioBar!: StudioBar;
+
   constructor() {
     this.init();
   }
 
-  init() {
+  private init(): void {
     // Check URL query parameters for embedded mode or direct day linking
     const params = new URLSearchParams(window.location.search);
     if (params.get('embedded') === 'true' || window.self !== window.top) {
       document.body.classList.add('embed-mode-active');
     }
 
-    const appContainer = document.getElementById('app');
-    const piazzaContainer = document.getElementById('piazzaContainer');
+    const appContainer = document.getElementById('app') as HTMLElement;
+    const piazzaContainer = document.getElementById('piazzaContainer') as HTMLElement;
+
+    if (!appContainer || !piazzaContainer) {
+      console.error('Core application containers not found in DOM.');
+      return;
+    }
 
     // 1. Initialize Day Modal
     this.dayModal = new DayModal({
       container: appContainer,
-      onCompletedChanged: (day) => {
+      onCompletedChanged: (_day: number) => {
         this.piazzaScene.updateAtmosphere();
         this.updateHeader();
       },
-      onNavigateDay: (day) => {
+      onNavigateDay: (day: number) => {
         this.piazzaScene.focusOnDay(day);
       }
     });
@@ -41,7 +53,7 @@ class AdventApp {
     // 2. Initialize Calendar Drawer
     this.calendarDrawer = new CalendarDrawer({
       container: appContainer,
-      onSelectDay: (day) => {
+      onSelectDay: (day: number) => {
         this.piazzaScene.focusOnDay(day);
         this.dayModal.open(day);
       }
@@ -50,7 +62,7 @@ class AdventApp {
     // 3. Initialize Interactive High-Fidelity 3D Piazza Scene
     this.piazzaScene = new PiazzaScene3D({
       container: piazzaContainer,
-      onSelectDay: (day) => {
+      onSelectDay: (day: number) => {
         this.piazzaScene.focusOnDay(day);
         this.dayModal.open(day);
       }
@@ -71,22 +83,29 @@ class AdventApp {
     storage.subscribe(() => {
       this.updateHeader();
       this.piazzaScene.updateAtmosphere();
+      this.piazzaScene.applyCurrentQuality();
     });
 
     // 7. Initial UI sync
     this.updateHeader();
 
     // Check if URL specified a direct day to open: e.g. ?day=1
-    const directDay = parseInt(params.get('day'), 10);
-    if (directDay >= 1 && directDay <= 24 && dateGate.isDayUnlocked(directDay)) {
-      setTimeout(() => {
-        this.piazzaScene.focusOnDay(directDay);
-        this.dayModal.open(directDay);
-      }, 600);
+    const directDayParam = params.get('day');
+    if (directDayParam) {
+      const directDay = parseInt(directDayParam, 10);
+      if (directDay >= 1 && directDay <= 24 && dateGate.isDayUnlocked(directDay)) {
+        setTimeout(() => {
+          this.piazzaScene.focusOnDay(directDay);
+          this.dayModal.open(directDay);
+        }, 600);
+      }
     }
+
+    // Expose instance on window for testing, automated verification, or host iframe messaging
+    (window as unknown as { __ADVENT_APP__: AdventApp }).__ADVENT_APP__ = this;
   }
 
-  bindHeaderControls() {
+  private bindHeaderControls(): void {
     // Calendar Drawer button
     document.getElementById('btnOpenCalendar')?.addEventListener('click', () => {
       this.calendarDrawer.toggle();
@@ -106,7 +125,7 @@ class AdventApp {
     this.updateAudioIcons();
   }
 
-  updateAudioIcons() {
+  private updateAudioIcons(): void {
     const isSoundOn = storage.getSoundEnabled();
     const iconOn = document.getElementById('iconAudioOn');
     const iconOff = document.getElementById('iconAudioOff');
@@ -117,7 +136,7 @@ class AdventApp {
     }
   }
 
-  updateHeader() {
+  public updateHeader(): void {
     const lang = storage.getLanguage();
     const completed = storage.getCompletedDays();
 
@@ -143,15 +162,27 @@ class AdventApp {
     }
   }
 
-  updateAllComponents() {
+  public updateAllComponents(): void {
     this.updateHeader();
     this.updateAudioIcons();
     this.piazzaScene.updateAtmosphere();
+    this.piazzaScene.applyCurrentQuality();
     this.studioBar.renderContent();
+  }
+
+  /**
+   * Graceful tear-down
+   */
+  public destroy(): void {
+    this.piazzaScene.destroy();
   }
 }
 
 // Start application when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new AdventApp();
+  });
+} else {
   new AdventApp();
-});
+}

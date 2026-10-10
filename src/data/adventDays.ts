@@ -1,10 +1,11 @@
 /**
  * 24 Advent Days Data Master
- * Supports both 2D percentage coordinates and full 3D world space coordinates
- * for the progressive 3D European Piazza environment.
+ * Typed with AdventDay interface
  */
 
-export const ADVENT_DAYS = [
+import type { AdventDay } from '../types/advent';
+
+export const ADVENT_DAYS: AdventDay[] = [
   {
     day: 1,
     dateLabel: "December 1",

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ADVENT_DAYS } from '../src/data/adventDays.js';
-import { SUPPORTED_LANGUAGES, t } from '../src/data/translations.js';
-import { dateGate } from '../src/services/dateGate.js';
-import { storage } from '../src/services/storage.js';
+import { ADVENT_DAYS } from '../src/data/adventDays';
+import { SUPPORTED_LANGUAGES, t } from '../src/data/translations';
+import { dateGate } from '../src/services/dateGate';
+import { storage } from '../src/services/storage';
+import type { QualityLevel } from '../src/types/advent';
 
 describe('Advent Calendar Dataset', () => {
   it('should contain exactly 24 days', () => {
@@ -77,7 +78,7 @@ describe('Date Gating Engine', () => {
   });
 });
 
-describe('Storage Service', () => {
+describe('Storage Service & Adaptive Quality Preferences', () => {
   beforeEach(() => {
     storage.resetAll();
   });
@@ -102,6 +103,14 @@ describe('Storage Service', () => {
   it('should remember language settings', () => {
     storage.setLanguage('es');
     expect(storage.getLanguage()).toBe('es');
+  });
+
+  it('should persist and retrieve graphics quality level', () => {
+    const levels: QualityLevel[] = ['auto', 'high', 'medium', 'low'];
+    levels.forEach((lvl) => {
+      storage.setQualityLevel(lvl);
+      expect(storage.getQualityLevel()).toBe(lvl);
+    });
   });
 });
 

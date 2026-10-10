@@ -1,24 +1,29 @@
 /**
  * Creative Studio & Client Review Bar
  * Tool for the studio team, art directors, and Church publishing team
- * to simulate dates, unlock all days, switch languages, toggle sound, and test embed modes.
+ * to simulate dates, unlock all days, switch languages, adjust graphic quality, toggle sound, and test embed modes.
  */
 
-import { SUPPORTED_LANGUAGES, t } from '../data/translations.js';
-import { storage } from '../services/storage.js';
-import { dateGate } from '../services/dateGate.js';
-import { soundManager } from '../audio/soundManager.js';
+import { SUPPORTED_LANGUAGES, t } from '../data/translations';
+import { storage } from '../services/storage';
+import { dateGate } from '../services/dateGate';
+import { soundManager } from '../audio/soundManager';
+import type { QualityLevel } from '../types/advent';
 
 export class StudioBar {
-  constructor({ container, onStateChanged }) {
+  private container: HTMLElement;
+  private onStateChanged: () => void;
+  public isExpanded: boolean = false;
+  private barEl!: HTMLElement;
+
+  constructor({ container, onStateChanged }: { container: HTMLElement; onStateChanged: () => void }) {
     this.container = container;
     this.onStateChanged = onStateChanged;
-    this.isExpanded = false;
 
     this.render();
   }
 
-  render() {
+  private render(): void {
     this.barEl = document.createElement('aside');
     this.barEl.className = 'studio-toolbar';
     this.barEl.id = 'studioToolbar';
@@ -28,11 +33,12 @@ export class StudioBar {
     this.renderContent();
   }
 
-  renderContent() {
+  renderContent(): void {
     const lang = storage.getLanguage();
     const unlockAll = storage.getUnlockAll();
     const simDay = storage.getSimulatedDay() || dateGate.getActiveDay();
     const soundOn = storage.getSoundEnabled();
+    const currentQuality = storage.getQualityLevel();
 
     this.barEl.innerHTML = `
       <div class="studio-header">
@@ -83,6 +89,17 @@ export class StudioBar {
           </select>
         </div>
 
+        <!-- Graphic Quality Selector -->
+        <div class="studio-control-group">
+          <label class="studio-label" for="selectQuality">${t('qualitySettings', lang)}:</label>
+          <select id="selectQuality" class="studio-select" aria-label="Select Graphic Quality">
+            <option value="auto" ${currentQuality === 'auto' ? 'selected' : ''}>⚡ Auto (Adaptive)</option>
+            <option value="high" ${currentQuality === 'high' ? 'selected' : ''}>🌟 High (Max 3D)</option>
+            <option value="medium" ${currentQuality === 'medium' ? 'selected' : ''}>⚖️ Medium</option>
+            <option value="low" ${currentQuality === 'low' ? 'selected' : ''}>🔋 Low (Eco / Mobile)</option>
+          </select>
+        </div>
+
         <!-- Sound Toggle -->
         <div class="studio-control-group toggle-group">
           <label class="studio-toggle-label" for="toggleSound">
@@ -104,15 +121,14 @@ export class StudioBar {
       </div>
     `;
 
-    // Bind event handlers
     document.getElementById('btnToggleStudio')?.addEventListener('click', () => {
       this.isExpanded = !this.isExpanded;
       this.renderContent();
     });
 
-    const simSlider = document.getElementById('simDateSlider');
+    const simSlider = document.getElementById('simDateSlider') as HTMLInputElement | null;
     simSlider?.addEventListener('input', (e) => {
-      const input = /** @type {HTMLInputElement} */ (e.target);
+      const input = e.target as HTMLInputElement;
       const val = parseInt(input.value, 10);
       const label = document.getElementById('simValLabel');
       if (label) label.textContent = `Dec ${val}`;
@@ -121,20 +137,27 @@ export class StudioBar {
     });
 
     document.getElementById('toggleUnlockAll')?.addEventListener('change', (e) => {
-      const input = /** @type {HTMLInputElement} */ (e.target);
+      const input = e.target as HTMLInputElement;
       storage.setUnlockAll(input.checked);
       soundManager.playClick();
       this.onStateChanged();
     });
 
     document.getElementById('selectLanguage')?.addEventListener('change', (e) => {
-      const select = /** @type {HTMLSelectElement} */ (e.target);
+      const select = e.target as HTMLSelectElement;
       storage.setLanguage(select.value);
       this.onStateChanged();
     });
 
+    document.getElementById('selectQuality')?.addEventListener('change', (e) => {
+      const select = e.target as HTMLSelectElement;
+      storage.setQualityLevel(select.value as QualityLevel);
+      soundManager.playClick();
+      this.onStateChanged();
+    });
+
     document.getElementById('toggleSound')?.addEventListener('change', (e) => {
-      const input = /** @type {HTMLInputElement} */ (e.target);
+      const input = e.target as HTMLInputElement;
       storage.setSoundEnabled(input.checked);
       if (input.checked) soundManager.playBell(520);
     });

@@ -1,9 +1,11 @@
 /**
  * Localisation (i18n) Architecture
- * English master plus modular support for 24 languages.
+ * Typed with TypeScript interfaces
  */
 
-export const SUPPORTED_LANGUAGES = [
+import type { LanguageInfo, TranslationDictionary } from '../types/advent';
+
+export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
   { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'es', name: 'Español', flag: '🇪🇸' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
@@ -30,7 +32,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'mt', name: 'Malti', flag: '🇲🇹' }
 ];
 
-export const TRANSLATIONS = {
+export const TRANSLATIONS: Record<string, TranslationDictionary> = {
   en: {
     appTitle: "The Advent Piazza",
     appSubtitle: "A 24-Day Journey of Light, Community & Expectation",
@@ -66,7 +68,9 @@ export const TRANSLATIONS = {
     resetView: "Reset Piazza View",
     todayBadge: "Today's Window",
     piazzaStatus: "Piazza Warmth",
-    piazzaProgress: "Piazza Awakening Progress"
+    piazzaProgress: "Piazza Awakening Progress",
+    qualitySettings: "Graphic Quality",
+    reducedMotionBadge: "Reduced Motion Active"
   },
   es: {
     appTitle: "La Plaza de Adviento",
@@ -103,7 +107,9 @@ export const TRANSLATIONS = {
     resetView: "Restablecer vista de la plaza",
     todayBadge: "Ventana de hoy",
     piazzaStatus: "Calidez de la plaza",
-    piazzaProgress: "Progreso del despertar de la plaza"
+    piazzaProgress: "Progreso del despertar de la plaza",
+    qualitySettings: "Calidad gráfica",
+    reducedMotionBadge: "Movimiento reducido activo"
   },
   fr: {
     appTitle: "La Piazza de l'Avent",
@@ -140,7 +146,9 @@ export const TRANSLATIONS = {
     resetView: "Vue d'ensemble",
     todayBadge: "Fenêtre d'aujourd'hui",
     piazzaStatus: "Chaleur de la Piazza",
-    piazzaProgress: "Progression de la Piazza"
+    piazzaProgress: "Progression de la Piazza",
+    qualitySettings: "Qualité graphique",
+    reducedMotionBadge: "Mouvements réduits actifs"
   },
   de: {
     appTitle: "Die Advents-Piazza",
@@ -177,7 +185,9 @@ export const TRANSLATIONS = {
     resetView: "Piazza zentrieren",
     todayBadge: "Heutiges Türchen",
     piazzaStatus: "Piazza-Wärme",
-    piazzaProgress: "Fortschritt der Piazza"
+    piazzaProgress: "Fortschritt der Piazza",
+    qualitySettings: "Grafikqualität",
+    reducedMotionBadge: "Reduzierte Bewegung aktiv"
   },
   it: {
     appTitle: "La Piazza d'Avvento",
@@ -214,7 +224,9 @@ export const TRANSLATIONS = {
     resetView: "Ripristina vista",
     todayBadge: "Finestra di oggi",
     piazzaStatus: "Calore della Piazza",
-    piazzaProgress: "Progresso risveglio Piazza"
+    piazzaProgress: "Progresso risveglio Piazza",
+    qualitySettings: "Qualità grafica",
+    reducedMotionBadge: "Movimento ridotto attivo"
   },
   pt: {
     appTitle: "A Praça do Advento",
@@ -251,14 +263,16 @@ export const TRANSLATIONS = {
     resetView: "Redefinir vista",
     todayBadge: "Janela de hoje",
     piazzaStatus: "Calor da Praça",
-    piazzaProgress: "Progresso da Praça"
+    piazzaProgress: "Progresso da Praça",
+    qualitySettings: "Qualidade gráfica",
+    reducedMotionBadge: "Movimento reduzido ativo"
   }
 };
 
 /**
  * Get translated text for a key, falling back to English if missing
  */
-export function t(key, lang = 'en') {
+export function t(key: string, lang = 'en'): string {
   const current = TRANSLATIONS[lang] || TRANSLATIONS.en;
   return current[key] || TRANSLATIONS.en[key] || key;
 }

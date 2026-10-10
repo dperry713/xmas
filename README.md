@@ -57,8 +57,10 @@ xmas/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                 # GitHub Actions CI (typecheck, test, build)
+├── scripts/
+│   └── compress-textures.js       # KTX2 GPU texture compression pipeline utility
 ├── tests/
-│   └── advent.test.js             # Vitest test suite (dataset, date gate, i18n, storage)
+│   └── advent.test.ts             # Vitest test suite (dataset, date gate, i18n, storage, quality)
 ├── public/
 │   └── assets/
 │       ├── cobblestones.jpg       # High-fidelity cobblestones texture
@@ -67,22 +69,24 @@ xmas/
 │       ├── sky_panorama.jpg       # Winter twilight sky panorama
 │       └── piazza_master.jpg      # Master illustration concept
 └── src/
-    ├── main.js                    # Application coordinator
+    ├── main.ts                    # Application coordinator (TypeScript)
     ├── style.css                  # Responsive design system & 3D pin overlays
+    ├── types/
+    │   └── advent.ts              # Master TypeScript type declarations
     ├── audio/
-    │   └── soundManager.js        # Zero-dependency Web Audio synthesizer
+    │   └── soundManager.ts        # Zero-dependency Web Audio synthesizer
     ├── components/
-    │   ├── piazzaScene3D.js       # Three.js 3D scene engine & progressive awakening
-    │   ├── dayModal.js            # Daily experience dialog with reflections & actions
-    │   ├── calendarDrawer.js      # Accessible 24-day slide-out list drawer
-    │   ├── studioBar.js           # Studio testing toolbar for date simulation
-    │   └── vignettes.js           # 24 looping animated motion vignettes
+    │   ├── piazzaScene3D.ts       # Three.js 3D engine (KTX2, adaptive quality, reduced-motion, destroy)
+    │   ├── dayModal.ts            # Daily experience dialog with reflections & actions
+    │   ├── calendarDrawer.ts      # Accessible 24-day slide-out list drawer
+    │   ├── studioBar.ts           # Studio testing toolbar for date simulation & quality
+    │   └── vignettes.ts           # 24 looping animated motion vignettes
     ├── data/
-    │   ├── adventDays.js          # Master 24-day dataset with 3D coordinates & church links
-    │   └── translations.js        # i18n localization dictionary (24 languages)
+    │   ├── adventDays.ts          # Master 24-day dataset with 3D coordinates & church links
+    │   └── translations.ts        # i18n localization dictionary (24 languages)
     └── services/
-        ├── dateGate.js            # December date gating & unlock rules
-        └── storage.js             # LocalStorage state management
+        ├── dateGate.ts            # December date gating & unlock rules
+        └── storage.ts             # LocalStorage state management
 ```
 
 ---

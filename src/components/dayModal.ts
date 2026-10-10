@@ -4,27 +4,41 @@
  * "Go Deeper" church links, and "Complete & Awaken Piazza" button.
  */
 
-import { ADVENT_DAYS } from '../data/adventDays.js';
-import { dateGate } from '../services/dateGate.js';
-import { storage } from '../services/storage.js';
-import { t } from '../data/translations.js';
-import { soundManager } from '../audio/soundManager.js';
-import { getVignetteMarkup } from './vignettes.js';
+import { ADVENT_DAYS } from '../data/adventDays';
+import { dateGate } from '../services/dateGate';
+import { storage } from '../services/storage';
+import { t } from '../data/translations';
+import { soundManager } from '../audio/soundManager';
+import { getVignetteMarkup } from './vignettes';
+import type { AdventDay } from '../types/advent';
 
 export class DayModal {
-  constructor({ container, onCompletedChanged, onNavigateDay }) {
+  private container: HTMLElement;
+  private onCompletedChanged: (day: number) => void;
+  private onNavigateDay: (day: number) => void;
+  private currentDay: number | null = null;
+  public isOpen: boolean = false;
+  private previouslyFocusedEl: Element | null = null;
+  private modalEl!: HTMLDivElement;
+
+  constructor({
+    container,
+    onCompletedChanged,
+    onNavigateDay
+  }: {
+    container: HTMLElement;
+    onCompletedChanged: (day: number) => void;
+    onNavigateDay: (day: number) => void;
+  }) {
     this.container = container;
     this.onCompletedChanged = onCompletedChanged;
     this.onNavigateDay = onNavigateDay;
-    this.currentDay = null;
-    this.isOpen = false;
-    this.previouslyFocusedEl = null;
 
     this.renderContainer();
     this.bindGlobalKeys();
   }
 
-  renderContainer() {
+  private renderContainer(): void {
     this.modalEl = document.createElement('div');
     this.modalEl.className = 'day-modal-overlay';
     this.modalEl.id = 'dayModalOverlay';
@@ -41,7 +55,7 @@ export class DayModal {
     });
   }
 
-  bindGlobalKeys() {
+  private bindGlobalKeys(): void {
     window.addEventListener('keydown', (e) => {
       if (!this.isOpen) return;
 
@@ -55,7 +69,7 @@ export class DayModal {
     });
   }
 
-  open(dayNumber) {
+  open(dayNumber: number): void {
     const data = ADVENT_DAYS.find(d => d.day === dayNumber);
     if (!data) return;
 
@@ -73,7 +87,7 @@ export class DayModal {
 
     // Focus close button for accessibility
     setTimeout(() => {
-      const closeBtn = /** @type {HTMLElement|null} */ (this.modalEl.querySelector('.modal-close-btn'));
+      const closeBtn = this.modalEl.querySelector('.modal-close-btn') as HTMLElement | null;
       if (closeBtn) closeBtn.focus();
     }, 50);
 
@@ -81,7 +95,7 @@ export class DayModal {
     soundManager.playBell(380 + (dayNumber * 12));
   }
 
-  close() {
+  close(): void {
     if (!this.isOpen) return;
     this.modalEl.classList.remove('is-open');
     this.modalEl.setAttribute('aria-hidden', 'true');
@@ -89,11 +103,11 @@ export class DayModal {
     document.body.classList.remove('modal-open');
 
     if (this.previouslyFocusedEl && 'focus' in this.previouslyFocusedEl) {
-      /** @type {HTMLElement} */ (this.previouslyFocusedEl).focus();
+      (this.previouslyFocusedEl as HTMLElement).focus();
     }
   }
 
-  navigate(direction) {
+  navigate(direction: number): void {
     if (!this.currentDay) return;
     const targetDay = this.currentDay + direction;
     if (targetDay < 1 || targetDay > 24) return;
@@ -105,7 +119,7 @@ export class DayModal {
     }
   }
 
-  renderContent(data) {
+  private renderContent(data: AdventDay): void {
     const lang = storage.getLanguage();
     const isCompleted = storage.isDayCompleted(data.day);
     const isUnlocked = dateGate.isDayUnlocked(data.day);
@@ -261,7 +275,6 @@ export class DayModal {
       </div>
     `;
 
-    // Wire events
     document.getElementById('btnModalClose')?.addEventListener('click', () => {
       soundManager.playClick();
       this.close();
@@ -287,7 +300,6 @@ export class DayModal {
       }
 
       this.onCompletedChanged(data.day);
-      // Re-render modal to reflect completion badge
       this.renderContent(data);
     });
   }

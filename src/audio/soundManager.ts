@@ -3,18 +3,16 @@
  * High-performance, zero-asset festive chimes, bell tolls, and ambient winter harmonics.
  */
 
-import { storage } from '../services/storage.js';
+import { storage } from '../services/storage';
 
 class SoundManager {
-  constructor() {
-    this.ctx = null;
-    this.ambientGain = null;
-    this.isAmbientPlaying = false;
-  }
+  private ctx: AudioContext | null = null;
 
-  initContext() {
+  constructor() {}
+
+  initContext(): void {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
@@ -24,29 +22,30 @@ class SoundManager {
     }
   }
 
-  isEnabled() {
+  isEnabled(): boolean {
     return storage.getSoundEnabled();
   }
 
   /**
    * Cathedral Bell Toll (Harmonic additive synthesis)
    */
-  playBell(freq = 440) {
+  playBell(freq = 440): void {
     if (!this.isEnabled()) return;
     this.initContext();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
     const partials = [
-      { ratio: 0.5, amp: 0.35, decay: 3.5 }, // Hum tone
-      { ratio: 1.0, amp: 0.5, decay: 2.8 },  // Prime / strike note
-      { ratio: 1.2, amp: 0.3, decay: 2.0 },  // Tierce (minor third)
-      { ratio: 1.5, amp: 0.25, decay: 1.8 }, // Quint
-      { ratio: 2.0, amp: 0.2, decay: 1.2 },  // Nominal
-      { ratio: 2.7, amp: 0.1, decay: 0.8 }   // Supernominal
+      { ratio: 0.5, amp: 0.35, decay: 3.5 },
+      { ratio: 1.0, amp: 0.5, decay: 2.8 },
+      { ratio: 1.2, amp: 0.3, decay: 2.0 },
+      { ratio: 1.5, amp: 0.25, decay: 1.8 },
+      { ratio: 2.0, amp: 0.2, decay: 1.2 },
+      { ratio: 2.7, amp: 0.1, decay: 0.8 }
     ];
 
     partials.forEach(({ ratio, amp, decay }) => {
+      if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
@@ -68,16 +67,16 @@ class SoundManager {
   /**
    * Crystalline harp arpeggio for unlocking / completing a day
    */
-  playCelebrationSparkle() {
+  playCelebrationSparkle(): void {
     if (!this.isEnabled()) return;
     this.initContext();
     if (!this.ctx) return;
 
-    // Pentatonic festive chime cascade
     const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
     const now = this.ctx.currentTime;
 
     notes.forEach((freq, idx) => {
+      if (!this.ctx) return;
       const noteTime = now + idx * 0.08;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -100,7 +99,7 @@ class SoundManager {
   /**
    * Subtle wooden / soft click UI feedback
    */
-  playClick() {
+  playClick(): void {
     if (!this.isEnabled()) return;
     this.initContext();
     if (!this.ctx) return;

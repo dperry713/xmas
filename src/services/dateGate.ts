@@ -4,13 +4,14 @@
  * or studio simulation overrides.
  */
 
-import { storage } from './storage.js';
+import { storage } from './storage';
+import type { DayStatus } from '../types/advent';
 
 class DateGateService {
   /**
    * Determine the effective active calendar day of Advent (1-24)
    */
-  getActiveDay() {
+  getActiveDay(): number {
     // 1. Studio override: Unlock All
     if (storage.getUnlockAll()) {
       return 24;
@@ -19,7 +20,7 @@ class DateGateService {
     // 2. Studio override: Specific simulated day
     const simDay = storage.getSimulatedDay();
     if (simDay !== null && simDay !== undefined) {
-      return Math.min(24, Math.max(1, parseInt(simDay, 10)));
+      return Math.min(24, Math.max(1, simDay));
     }
 
     // 3. Real calendar date
@@ -40,7 +41,7 @@ class DateGateService {
   /**
    * Check if a given day (1-24) is unlocked
    */
-  isDayUnlocked(day) {
+  isDayUnlocked(day: number): boolean {
     if (storage.getUnlockAll()) return true;
     const activeDay = this.getActiveDay();
     return day <= activeDay;
@@ -49,14 +50,14 @@ class DateGateService {
   /**
    * Check if a given day is the specific "Today" window
    */
-  isToday(day) {
+  isToday(day: number): boolean {
     return day === this.getActiveDay();
   }
 
   /**
    * Return status: 'completed' | 'available' | 'locked'
    */
-  getDayStatus(day) {
+  getDayStatus(day: number): DayStatus {
     if (!this.isDayUnlocked(day)) {
       return 'locked';
     }

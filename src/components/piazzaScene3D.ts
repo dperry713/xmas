@@ -1,43 +1,111 @@
 /**
  * The Advent Piazza — High-Fidelity 3D Interactive Scene Engine
- * Built with Three.js: Features progressive 3D awakening, volumetric snow,
- * dynamic spatial lighting, high-res textures, interactive 3D hotspots, and smooth camera controls.
+ * Written in TypeScript: Features full resource disposal, adaptive quality,
+ * prefers-reduced-motion compliance, KTX2 readiness, volumetric snow, and spatial lighting.
  */
 
 import * as THREE from 'three';
-import { ADVENT_DAYS } from '../data/adventDays.js';
-import { dateGate } from '../services/dateGate.js';
-import { storage } from '../services/storage.js';
-import { t } from '../data/translations.js';
-import { soundManager } from '../audio/soundManager.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { ADVENT_DAYS } from '../data/adventDays';
+import { dateGate } from '../services/dateGate';
+import { storage } from '../services/storage';
+import { t } from '../data/translations';
+import { soundManager } from '../audio/soundManager';
+import type { QualityLevel } from '../types/advent';
 
 export class PiazzaScene3D {
-  constructor({ container, onSelectDay }) {
+  private container: HTMLElement;
+  private onSelectDay: (day: number) => void;
+
+  private animId: number | null = null;
+  private lastTime: number = performance.now();
+  private awakenedObjects = new Map<number, { activate: () => void; deactivate: () => void }>();
+  private hotspotElements = new Map<number, { element: HTMLElement; pos3d: THREE.Vector3 }>();
+
+  // Three.js Core
+  private scene!: THREE.Scene;
+  private camera!: THREE.PerspectiveCamera;
+  private renderer!: THREE.WebGLRenderer;
+  private resizeObserver: ResizeObserver | null = null;
+
+  // DOM elements
+  private viewportEl!: HTMLElement;
+  private canvasEl!: HTMLCanvasElement;
+  private hotspotsOverlayEl!: HTMLElement;
+
+  // Textures
+  private textureLoader!: THREE.TextureLoader;
+  private cobbleTex!: THREE.Texture;
+  private cathedralTex!: THREE.Texture;
+  private townhousesTex!: THREE.Texture;
+  private skyTex!: THREE.Texture;
+
+  // World objects
+  private skyMesh!: THREE.Mesh;
+  private ambientLight!: THREE.AmbientLight;
+  private moonLight!: THREE.DirectionalLight;
+  private roseLight!: THREE.PointLight;
+  private portalLight!: THREE.PointLight;
+  private treeGroup!: THREE.Group;
+  private treeFairyLights: THREE.Mesh[] = [];
+  private treeStar!: THREE.Mesh;
+  private treeStarLight!: THREE.PointLight;
+  private festoonGroup!: THREE.Group;
+  private snowPoints!: THREE.Points;
+  private snowSpeeds!: Float32Array;
+
+  // Camera Orbit & Animation State
+  private isCameraAnimating: boolean = false;
+  private isDragging: boolean = false;
+  private previousMousePosition = { x: 0, y: 0 };
+  private cameraDistance: number = 55;
+  private cameraTheta: number = Math.PI / 2;
+  private cameraPhi: number = Math.PI / 3.4;
+  private targetCenter = new THREE.Vector3(0, 8, -5);
+
+  // Prefers-reduced-motion
+  private prefersReducedMotion: boolean = false;
+  private mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
+
+  // Bound Event Listeners for cleanup
+  private boundMouseDown!: (e: MouseEvent) => void;
+  private boundMouseMove!: (e: MouseEvent) => void;
+  private boundMouseUp!: () => void;
+  private boundWheel!: (e: WheelEvent) => void;
+  private boundTouchStart!: (e: TouchEvent) => void;
+  private boundTouchMove!: (e: TouchEvent) => void;
+  private boundTouchEnd!: () => void;
+  private boundResize!: () => void;
+  private boundZoomIn!: () => void;
+  private boundZoomOut!: () => void;
+  private boundResetView!: () => void;
+
+  // KTX2 & Adaptive Quality Engine State
+  private ktx2Loader: KTX2Loader | null = null;
+  private currentEffectiveQuality: 'high' | 'medium' | 'low' = 'high';
+  private fpsFrames: number = 0;
+  private fpsLastSample: number = performance.now();
+  private lowFpsStreak: number = 0;
+
+  constructor({ container, onSelectDay }: { container: HTMLElement; onSelectDay: (day: number) => void }) {
     this.container = container;
     this.onSelectDay = onSelectDay;
 
-    this.animId = null;
-    this.lastTime = performance.now();
-    this.awakenedObjects = new Map();
-    this.hotspotElements = new Map();
-
-    // Camera fly-to interpolation state
-    this.camTargetPos = null;
-    this.camLookTarget = null;
-    this.isCameraAnimating = false;
-
-    // Mouse / Touch interaction
-    this.isDragging = false;
-    this.previousMousePosition = { x: 0, y: 0 };
-    this.cameraDistance = 55;
-    this.cameraTheta = Math.PI / 2; // Azimuth angle
-    this.cameraPhi = Math.PI / 3.4;  // Polar angle
-    this.targetCenter = new THREE.Vector3(0, 8, -5);
-
+    this.checkReducedMotion();
     this.init();
   }
 
-  init() {
+  private checkReducedMotion(): void {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.prefersReducedMotion = mq.matches;
+
+    this.mediaQueryListener = (e: MediaQueryListEvent) => {
+      this.prefersReducedMotion = e.matches;
+    };
+    mq.addEventListener('change', this.mediaQueryListener);
+  }
+
+  private init(): void {
     this.renderDOM();
     this.initThree();
     this.loadTextures();
@@ -48,16 +116,12 @@ export class PiazzaScene3D {
     this.animate();
   }
 
-  renderDOM() {
+  private renderDOM(): void {
     this.container.innerHTML = `
       <div class="piazza-3d-viewport" id="piazza3dViewport">
-        <!-- Three.js Canvas container -->
         <canvas id="piazza3dCanvas"></canvas>
-
-        <!-- Screen-projected 3D Hotspot Badges Container -->
         <div class="piazza-3d-hotspots-overlay" id="piazza3dHotspotsOverlay"></div>
 
-        <!-- 3D Viewport Navigation Controls -->
         <nav class="piazza-view-controls" aria-label="3D Camera Controls">
           <button class="view-ctrl-btn" id="btn3dZoomIn" title="Zoom In" aria-label="Zoom in 3D camera">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
@@ -70,21 +134,34 @@ export class PiazzaScene3D {
           </button>
         </nav>
 
-        <!-- 3D Navigation Hint -->
         <div class="piazza-pan-hint" id="piazza3dHint">
           <span>✨ 3D European Piazza · Drag to rotate around the square · Scroll or pinch to zoom</span>
         </div>
       </div>
     `;
 
-    this.viewportEl = document.getElementById('piazza3dViewport');
-    this.canvasEl = document.getElementById('piazza3dCanvas');
-    this.hotspotsOverlayEl = document.getElementById('piazza3dHotspotsOverlay');
+    this.viewportEl = document.getElementById('piazza3dViewport') as HTMLElement;
+    this.canvasEl = document.getElementById('piazza3dCanvas') as HTMLCanvasElement;
+    this.hotspotsOverlayEl = document.getElementById('piazza3dHotspotsOverlay') as HTMLElement;
   }
 
-  initThree() {
+  public getEffectiveQuality(): 'high' | 'medium' | 'low' {
+    const setting: QualityLevel = storage.getQualityLevel();
+    if (setting !== 'auto') return setting;
+
+    // Adaptive auto detection: check hardware concurrency & mobile user agent
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const cores = navigator.hardwareConcurrency || 4;
+
+    if (isMobile || cores <= 4) return 'medium';
+    return 'high';
+  }
+
+  private initThree(): void {
     const width = this.viewportEl.clientWidth || window.innerWidth;
     const height = this.viewportEl.clientHeight || window.innerHeight;
+    this.currentEffectiveQuality = this.getEffectiveQuality();
+    const quality = this.currentEffectiveQuality;
 
     // 1. Scene
     this.scene = new THREE.Scene();
@@ -94,26 +171,41 @@ export class PiazzaScene3D {
     this.camera = new THREE.PerspectiveCamera(52, width / height, 0.1, 1200);
     this.updateCameraOrbit();
 
-    // 3. Renderer
+    // 3. Renderer with Adaptive Quality
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvasEl,
-      antialias: true,
+      antialias: quality !== 'low',
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
+
+    const maxPixelRatio = quality === 'high' ? 2 : quality === 'medium' ? 1.25 : 1;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+
+    this.renderer.shadowMap.enabled = quality !== 'low';
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 
-    // Window resize and ResizeObserver for responsive full-screen coverage
+    // 4. KTX2 / Compressed Texture Pipeline initialization
+    try {
+      this.ktx2Loader = new KTX2Loader();
+      this.ktx2Loader.setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/libs/basis/');
+      this.ktx2Loader.detectSupport(this.renderer);
+    } catch (err) {
+      console.warn('KTX2Loader initialization skipped:', err);
+      this.ktx2Loader = null;
+    }
+
+    // ResizeObserver
     this.resizeObserver = new ResizeObserver(() => this.onResize());
     this.resizeObserver.observe(this.viewportEl);
-    window.addEventListener('resize', () => this.onResize());
+
+    this.boundResize = () => this.onResize();
+    window.addEventListener('resize', this.boundResize);
   }
 
-  onResize() {
+  private onResize(): void {
     if (!this.viewportEl || !this.camera || !this.renderer) return;
     const w = this.viewportEl.clientWidth || window.innerWidth;
     const h = this.viewportEl.clientHeight || window.innerHeight;
@@ -123,31 +215,60 @@ export class PiazzaScene3D {
     this.renderer.setSize(w, h);
   }
 
-  loadTextures() {
+  private loadTextures(): void {
     this.textureLoader = new THREE.TextureLoader();
     const base = import.meta.env.BASE_URL.endsWith('/')
       ? import.meta.env.BASE_URL
       : import.meta.env.BASE_URL + '/';
 
-    // Cobblestone pavement
-    this.cobbleTex = this.textureLoader.load(base + 'assets/cobblestones.jpg');
-    this.cobbleTex.wrapS = THREE.RepeatWrapping;
-    this.cobbleTex.wrapT = THREE.RepeatWrapping;
-    this.cobbleTex.repeat.set(28, 28);
+    // Cobblestone pavement (supports KTX2 with JPG fallback)
+    this.cobbleTex = this.loadTextureWithKTX2Fallback(base + 'assets/cobblestones.jpg', { x: 28, y: 28 });
 
     // Cathedral Gothic Facade
-    this.cathedralTex = this.textureLoader.load(base + 'assets/cathedral_facade.jpg');
+    this.cathedralTex = this.loadTextureWithKTX2Fallback(base + 'assets/cathedral_facade.jpg');
 
     // Historic Townhouses
-    this.townhousesTex = this.textureLoader.load(base + 'assets/townhouses_facade.jpg');
-    this.townhousesTex.wrapS = THREE.RepeatWrapping;
-    this.townhousesTex.repeat.set(2, 1);
+    this.townhousesTex = this.loadTextureWithKTX2Fallback(base + 'assets/townhouses_facade.jpg', { x: 2, y: 1 });
 
     // Sky Panorama Dome
-    this.skyTex = this.textureLoader.load(base + 'assets/sky_panorama.jpg');
+    this.skyTex = this.loadTextureWithKTX2Fallback(base + 'assets/sky_panorama.jpg');
   }
 
-  buildWorld() {
+  /**
+   * KTX2 / Compressed Texture Pipeline loader with automatic JPEG/PNG fallback
+   */
+  private loadTextureWithKTX2Fallback(standardPath: string, repeat?: { x: number; y: number }): THREE.Texture {
+    const tex = this.textureLoader.load(standardPath);
+    if (repeat) {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repeat.x, repeat.y);
+    }
+
+    if (this.ktx2Loader) {
+      const ktx2Path = standardPath.replace(/\.(jpe?g|png)$/i, '.ktx2');
+      this.ktx2Loader.load(
+        ktx2Path,
+        (ktxTexture) => {
+          if (repeat) {
+            ktxTexture.wrapS = THREE.RepeatWrapping;
+            ktxTexture.wrapT = THREE.RepeatWrapping;
+            ktxTexture.repeat.set(repeat.x, repeat.y);
+          }
+          (tex as unknown as THREE.CompressedTexture).copy(ktxTexture);
+          tex.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          // Fallback seamlessly retained via standard TextureLoader
+        }
+      );
+    }
+
+    return tex;
+  }
+
+  private buildWorld(): void {
     // 1. Celestial Skydome
     const skyGeo = new THREE.SphereGeometry(300, 32, 20);
     const skyMat = new THREE.MeshBasicMaterial({
@@ -158,7 +279,7 @@ export class PiazzaScene3D {
     this.skyMesh.rotation.y = -Math.PI / 1.8;
     this.scene.add(this.skyMesh);
 
-    // 2. Base Cobblestone Piazza Ground Plane (Expansive to prevent cutoffs)
+    // 2. Base Cobblestone Piazza Ground Plane
     const groundGeo = new THREE.PlaneGeometry(350, 350);
     const groundMat = new THREE.MeshStandardMaterial({
       map: this.cobbleTex,
@@ -178,30 +299,29 @@ export class PiazzaScene3D {
     // Moonlight directional light
     this.moonLight = new THREE.DirectionalLight(0x7ea0d6, 0.85);
     this.moonLight.position.set(40, 70, 30);
-    this.moonLight.castShadow = true;
+    this.moonLight.castShadow = this.getEffectiveQuality() !== 'low';
     this.moonLight.shadow.mapSize.width = 1024;
     this.moonLight.shadow.mapSize.height = 1024;
     this.moonLight.shadow.bias = -0.001;
     this.scene.add(this.moonLight);
 
-    // 4. Gothic Cathedral Structure (Center Rear)
+    // 4. Gothic Cathedral Structure
     this.buildCathedral();
 
     // 5. Left & Right Townhouses Wings
     this.buildTownhouses();
 
-    // 6. Progressive 3D Scene Elements
+    // 6. Progressive 3D Elements
     this.buildProgressiveElements();
 
     // 7. Volumetric 3D Falling Snow
     this.buildVolumetricSnow();
   }
 
-  buildCathedral() {
+  private buildCathedral(): void {
     const catGroup = new THREE.Group();
     catGroup.position.set(0, 0, -56);
 
-    // Main Cathedral Body
     const bodyGeo = new THREE.BoxGeometry(44, 48, 20);
     const bodyMat = new THREE.MeshStandardMaterial({
       map: this.cathedralTex,
@@ -214,7 +334,6 @@ export class PiazzaScene3D {
     catBody.receiveShadow = true;
     catGroup.add(catBody);
 
-    // Left & Right Spires
     const spireGeo = new THREE.ConeGeometry(5.5, 26, 8);
     const spireMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
 
@@ -226,12 +345,12 @@ export class PiazzaScene3D {
     rightSpire.position.set(18, 60, 0);
     catGroup.add(rightSpire);
 
-    // Cathedral Rose Window illumination (Day 8 target - internal stained glass light)
+    // Internal Rose Window illumination
     this.roseLight = new THREE.PointLight(0xfcd34d, 0, 50, 1.4);
     this.roseLight.position.set(0, 26, 11);
     catGroup.add(this.roseLight);
 
-    // Cathedral Grand Portal (Day 16 target)
+    // Cathedral Grand Portal
     this.portalLight = new THREE.PointLight(0xf59e0b, 0, 40, 1.2);
     this.portalLight.position.set(0, 4, 11);
     catGroup.add(this.portalLight);
@@ -239,8 +358,8 @@ export class PiazzaScene3D {
     this.scene.add(catGroup);
   }
 
-  buildTownhouses() {
-    // Left Wing (West Facade)
+  private buildTownhouses(): void {
+    // West Wing
     const leftGroup = new THREE.Group();
     leftGroup.position.set(-46, 0, -12);
     leftGroup.rotation.y = Math.PI / 2;
@@ -257,7 +376,6 @@ export class PiazzaScene3D {
     leftMesh.receiveShadow = true;
     leftGroup.add(leftMesh);
 
-    // Gabled Roofs with Snow
     const roofGeo = new THREE.ConeGeometry(9, 10, 4);
     const roofMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
     for (let x = -28; x <= 28; x += 14) {
@@ -268,7 +386,7 @@ export class PiazzaScene3D {
     }
     this.scene.add(leftGroup);
 
-    // Right Wing (East Facade)
+    // East Wing
     const rightGroup = new THREE.Group();
     rightGroup.position.set(46, 0, -12);
     rightGroup.rotation.y = -Math.PI / 2;
@@ -288,10 +406,8 @@ export class PiazzaScene3D {
     this.scene.add(rightGroup);
   }
 
-  buildProgressiveElements() {
-    // ----------------------------------------------------
+  private buildProgressiveElements(): void {
     // Day 1: North Street Gas Lamp
-    // ----------------------------------------------------
     const lamp1 = this.createGasLampMesh(-28, 10);
     this.scene.add(lamp1.group);
     this.awakenedObjects.set(1, {
@@ -299,9 +415,7 @@ export class PiazzaScene3D {
       deactivate: () => lamp1.setPower(false)
     });
 
-    // ----------------------------------------------------
-    // Day 2: Old Town Bakery Window & Hearth Glow
-    // ----------------------------------------------------
+    // Day 2: Bakery Hearth Glow
     const bakeryLight = new THREE.PointLight(0xf97316, 0, 22, 1.4);
     bakeryLight.position.set(-36, 4, -15);
     this.scene.add(bakeryLight);
@@ -310,9 +424,7 @@ export class PiazzaScene3D {
       deactivate: () => { bakeryLight.intensity = 0; }
     });
 
-    // ----------------------------------------------------
     // Day 4: Central Stone Fountain
-    // ----------------------------------------------------
     const fountainGroup = new THREE.Group();
     fountainGroup.position.set(16, 0, 6);
 
@@ -323,7 +435,6 @@ export class PiazzaScene3D {
     basin.castShadow = true;
     fountainGroup.add(basin);
 
-    // Water surface
     const waterGeo = new THREE.CircleGeometry(5.2, 16);
     const waterMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
@@ -345,35 +456,24 @@ export class PiazzaScene3D {
       deactivate: () => { fountainLight.intensity = 0; }
     });
 
-    // ----------------------------------------------------
     // Day 5: Spiced Cider Wooden Stall
-    // ----------------------------------------------------
-    const ciderStall = this.createMarketStallMesh(-20, -4, 0xef4444, "Spiced Cider");
+    const ciderStall = this.createMarketStallMesh(-20, -4, 0xef4444);
     this.scene.add(ciderStall.group);
     this.awakenedObjects.set(5, {
       activate: () => ciderStall.setVisible(true),
       deactivate: () => ciderStall.setVisible(false)
     });
 
-    // ----------------------------------------------------
     // Day 8: Cathedral Rose Window
-    // ----------------------------------------------------
     this.awakenedObjects.set(8, {
-      activate: () => {
-        this.roseLight.intensity = 3.5;
-      },
-      deactivate: () => {
-        this.roseLight.intensity = 0;
-      }
+      activate: () => { this.roseLight.intensity = 3.5; },
+      deactivate: () => { this.roseLight.intensity = 0; }
     });
 
-    // ----------------------------------------------------
     // Day 11: The Grand Evergreen Christmas Tree
-    // ----------------------------------------------------
     this.treeGroup = new THREE.Group();
     this.treeGroup.position.set(0, 0, -12);
 
-    // Multi-tiered foliage cones with snow caps and baubles
     const foliageMat = new THREE.MeshStandardMaterial({ color: 0x064e3b, roughness: 0.7 });
     const snowCapMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
     const redBaubleMat = new THREE.MeshStandardMaterial({ color: 0xd90429, metalness: 0.85, roughness: 0.2 });
@@ -390,14 +490,12 @@ export class PiazzaScene3D {
       cone.castShadow = true;
       this.treeGroup.add(cone);
 
-      // Snow frosting ring on tier ledge
       const snowRingGeo = new THREE.TorusGeometry(tierRadii[i] * 0.95, 0.35, 6, 16);
       const snowRing = new THREE.Mesh(snowRingGeo, snowCapMat);
       snowRing.rotation.x = Math.PI / 2;
       snowRing.position.y = yOffset + 0.3;
       this.treeGroup.add(snowRing);
 
-      // Decorative baubles around each tier
       const baubleCount = 6 + i * 2;
       for (let b = 0; b < baubleCount; b++) {
         const bAngle = (b / baubleCount) * Math.PI * 2;
@@ -411,7 +509,6 @@ export class PiazzaScene3D {
       yOffset += tierHeights[i] * 0.7;
     }
 
-    // Trunk
     const trunkGeo = new THREE.CylinderGeometry(1, 1.2, 4, 8);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b3a29 });
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
@@ -439,8 +536,8 @@ export class PiazzaScene3D {
 
     // Day 24: Bethlehem Star atop tree
     const starGeo = new THREE.OctahedronGeometry(1.6, 0);
-    this.treeStarMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-    this.treeStar = new THREE.Mesh(starGeo, this.treeStarMat);
+    const starMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    this.treeStar = new THREE.Mesh(starGeo, starMat);
     this.treeStar.position.set(0, yOffset + 1.2, 0);
     this.treeStar.scale.set(1, 1.8, 1);
     this.treeStar.visible = false;
@@ -458,7 +555,7 @@ export class PiazzaScene3D {
     });
 
     // Day 12: Lebkuchen Gingerbread Stall
-    const gingerStall = this.createMarketStallMesh(32, -8, 0xd97706, "Lebkuchen");
+    const gingerStall = this.createMarketStallMesh(32, -8, 0xd97706);
     this.scene.add(gingerStall.group);
     this.awakenedObjects.set(12, {
       activate: () => gingerStall.setVisible(true),
@@ -486,7 +583,7 @@ export class PiazzaScene3D {
     });
 
     // Day 20: Olive Wood Nativity Creche Stall
-    const crecheStall = this.createMarketStallMesh(22, -22, 0x92400e, "Nativity Creche");
+    const crecheStall = this.createMarketStallMesh(22, -22, 0x92400e);
     this.scene.add(crecheStall.group);
     this.awakenedObjects.set(20, {
       activate: () => crecheStall.setVisible(true),
@@ -516,11 +613,10 @@ export class PiazzaScene3D {
     });
   }
 
-  createGasLampMesh(x, z) {
+  private createGasLampMesh(x: number, z: number): { group: THREE.Group; setPower: (on: boolean) => void } {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
 
-    // Cast-iron pole
     const poleGeo = new THREE.CylinderGeometry(0.22, 0.35, 7, 8);
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
     const pole = new THREE.Mesh(poleGeo, poleMat);
@@ -528,33 +624,30 @@ export class PiazzaScene3D {
     pole.castShadow = true;
     group.add(pole);
 
-    // Lantern fixture
     const fixtureGeo = new THREE.OctahedronGeometry(0.7, 0);
     const fixtureMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
     const fixture = new THREE.Mesh(fixtureGeo, fixtureMat);
     fixture.position.y = 7.2;
     group.add(fixture);
 
-    // Dynamic Point Light casting light onto the stones
     const pointLight = new THREE.PointLight(0xf59e0b, 0, 24, 1.5);
     pointLight.position.y = 7.3;
-    pointLight.castShadow = true;
+    pointLight.castShadow = this.getEffectiveQuality() === 'high';
     group.add(pointLight);
 
     return {
       group,
-      setPower: (on) => {
+      setPower: (on: boolean) => {
         fixtureMat.color.setHex(on ? 0xfef08a : 0x475569);
         pointLight.intensity = on ? 2.5 : 0;
       }
     };
   }
 
-  createMarketStallMesh(x, z, canopyColorHex, label) {
+  private createMarketStallMesh(x: number, z: number, canopyColorHex: number): { group: THREE.Group; setVisible: (val: boolean) => void } {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
 
-    // Wooden booth base
     const baseGeo = new THREE.BoxGeometry(7, 3, 5);
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
     const base = new THREE.Mesh(baseGeo, woodMat);
@@ -562,7 +655,6 @@ export class PiazzaScene3D {
     base.castShadow = true;
     group.add(base);
 
-    // Canopy roof
     const roofGeo = new THREE.ConeGeometry(4.8, 2.2, 4);
     const canopyMat = new THREE.MeshStandardMaterial({ color: canopyColorHex, roughness: 0.5 });
     const roof = new THREE.Mesh(roofGeo, canopyMat);
@@ -570,7 +662,6 @@ export class PiazzaScene3D {
     roof.rotation.y = Math.PI / 4;
     group.add(roof);
 
-    // Stall lantern
     const stallLight = new THREE.PointLight(0xfcd34d, 1.4, 12, 1.6);
     stallLight.position.set(0, 3.2, 1.5);
     group.add(stallLight);
@@ -578,11 +669,11 @@ export class PiazzaScene3D {
     group.visible = false;
     return {
       group,
-      setVisible: (val) => { group.visible = val; }
+      setVisible: (val: boolean) => { group.visible = val; }
     };
   }
 
-  createFestoonStrings() {
+  private createFestoonStrings(): THREE.Group {
     const group = new THREE.Group();
     group.position.set(0, 18, -10);
 
@@ -591,7 +682,6 @@ export class PiazzaScene3D {
 
     for (let row = -20; row <= 20; row += 10) {
       for (let x = -30; x <= 30; x += 3.5) {
-        // Catenary sag curve
         const sag = Math.sin((x + 30) / 60 * Math.PI) * 3.5;
         const bulb = new THREE.Mesh(bulbGeo, bulbMat);
         bulb.position.set(x, -sag, row);
@@ -602,8 +692,10 @@ export class PiazzaScene3D {
     return group;
   }
 
-  buildVolumetricSnow() {
-    const count = 3500;
+  private buildVolumetricSnow(): void {
+    const quality = this.getEffectiveQuality();
+    const count = quality === 'high' ? 3500 : quality === 'medium' ? 1800 : 800;
+
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const speeds = new Float32Array(count);
@@ -629,7 +721,7 @@ export class PiazzaScene3D {
     this.scene.add(this.snowPoints);
   }
 
-  build3DHotspots() {
+  build3DHotspots(): void {
     this.hotspotsOverlayEl.innerHTML = '';
     this.hotspotElements.clear();
 
@@ -681,15 +773,13 @@ export class PiazzaScene3D {
     });
   }
 
-  updateHotspotsScreenProjection() {
+  private updateHotspotsScreenProjection(): void {
     const halfWidth = this.viewportEl.clientWidth / 2;
     const halfHeight = this.viewportEl.clientHeight / 2;
 
     this.hotspotElements.forEach(({ element, pos3d }) => {
-      // Project 3D vector into Normalized Device Coordinates (NDC)
       const projected = pos3d.clone().project(this.camera);
 
-      // Check if behind camera or outside near frustum
       if (projected.z > 1.0) {
         element.style.display = 'none';
         return;
@@ -698,11 +788,9 @@ export class PiazzaScene3D {
       const screenX = (projected.x * halfWidth) + halfWidth;
       const screenY = -(projected.y * halfHeight) + halfHeight;
 
-      // Distance-aware dynamic scaling: smooth scaling based on camera distance
       const dist = pos3d.distanceTo(this.camera.position);
       const scale = Math.max(0.72, Math.min(1.22, 55 / dist));
 
-      // Viewport margin culling
       if (dist > 180 || screenX < -40 || screenX > (halfWidth * 2 + 40) || screenY < -40 || screenY > (halfHeight * 2 + 40)) {
         element.style.display = 'none';
         return;
@@ -713,15 +801,13 @@ export class PiazzaScene3D {
     });
   }
 
-  updateAtmosphere() {
+  updateAtmosphere(): void {
     const completedDays = storage.getCompletedDays();
     const unlockAll = storage.getUnlockAll();
     const count = completedDays.length;
     const ratio = Math.min(1, count / 24);
 
-    // Warm up sky and ambient light as days are completed
     if (this.ambientLight) {
-      // From cold blue (0x1a2744) to warm candlelight ambient (0x453124)
       const warmColor = new THREE.Color().lerpColors(
         new THREE.Color(0x1a2744),
         new THREE.Color(0x453124),
@@ -731,7 +817,6 @@ export class PiazzaScene3D {
       this.ambientLight.intensity = 0.9 + ratio * 0.4;
     }
 
-    // Activate/deactivate progressive elements based on thresholds
     this.awakenedObjects.forEach(({ activate, deactivate }, thresholdDay) => {
       const isAwakened = completedDays.includes(thresholdDay) || unlockAll;
       if (isAwakened) {
@@ -741,21 +826,19 @@ export class PiazzaScene3D {
       }
     });
 
-    // Re-render hotspot badge classes
     this.build3DHotspots();
   }
 
-  initControls() {
-    // Mouse Drag Rotation
-    this.viewportEl.addEventListener('mousedown', (e) => {
-      const target = /** @type {HTMLElement|null} */ (e.target);
+  private initControls(): void {
+    this.boundMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
       if (target?.closest?.('.piazza-3d-pin') || target?.closest?.('.view-ctrl-btn')) return;
       this.isDragging = true;
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
       document.getElementById('piazza3dHint')?.classList.add('is-dismissed');
-    });
+    };
 
-    window.addEventListener('mousemove', (e) => {
+    this.boundMouseMove = (e: MouseEvent) => {
       if (!this.isDragging) return;
       const deltaX = e.clientX - this.previousMousePosition.x;
       const deltaY = e.clientY - this.previousMousePosition.y;
@@ -765,23 +848,21 @@ export class PiazzaScene3D {
 
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
       this.updateCameraOrbit();
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    this.boundMouseUp = () => {
       this.isDragging = false;
-    });
+    };
 
-    // Wheel Zoom
-    this.viewportEl.addEventListener('wheel', (e) => {
+    this.boundWheel = (e: WheelEvent) => {
       e.preventDefault();
       const zoomFactor = e.deltaY > 0 ? 1.08 : 0.92;
       this.cameraDistance = Math.max(12, Math.min(85, this.cameraDistance * zoomFactor));
       this.updateCameraOrbit();
-    }, { passive: false });
+    };
 
-    // Touch Support for Mobile / Tablet
     let touchStartDist = 0;
-    this.viewportEl.addEventListener('touchstart', (e) => {
+    this.boundTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         this.isDragging = true;
         this.previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -793,9 +874,9 @@ export class PiazzaScene3D {
         );
       }
       document.getElementById('piazza3dHint')?.classList.add('is-dismissed');
-    }, { passive: true });
+    };
 
-    window.addEventListener('touchmove', (e) => {
+    this.boundTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 1 && this.isDragging) {
         const deltaX = e.touches[0].clientX - this.previousMousePosition.x;
         const deltaY = e.touches[0].clientY - this.previousMousePosition.y;
@@ -815,32 +896,44 @@ export class PiazzaScene3D {
         touchStartDist = dist;
         this.updateCameraOrbit();
       }
-    });
+    };
 
-    window.addEventListener('touchend', () => {
+    this.boundTouchEnd = () => {
       this.isDragging = false;
-    });
+    };
 
-    // Zoom Buttons
-    document.getElementById('btn3dZoomIn')?.addEventListener('click', () => {
+    this.viewportEl.addEventListener('mousedown', this.boundMouseDown);
+    window.addEventListener('mousemove', this.boundMouseMove);
+    window.addEventListener('mouseup', this.boundMouseUp);
+    this.viewportEl.addEventListener('wheel', this.boundWheel, { passive: false });
+
+    this.viewportEl.addEventListener('touchstart', this.boundTouchStart, { passive: true });
+    window.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+    window.addEventListener('touchend', this.boundTouchEnd);
+
+    this.boundZoomIn = () => {
       soundManager.playClick();
       this.cameraDistance = Math.max(12, this.cameraDistance * 0.85);
       this.updateCameraOrbit();
-    });
+    };
 
-    document.getElementById('btn3dZoomOut')?.addEventListener('click', () => {
+    this.boundZoomOut = () => {
       soundManager.playClick();
       this.cameraDistance = Math.min(85, this.cameraDistance * 1.15);
       this.updateCameraOrbit();
-    });
+    };
 
-    document.getElementById('btn3dReset')?.addEventListener('click', () => {
+    this.boundResetView = () => {
       soundManager.playClick();
       this.resetView();
-    });
+    };
+
+    document.getElementById('btn3dZoomIn')?.addEventListener('click', this.boundZoomIn);
+    document.getElementById('btn3dZoomOut')?.addEventListener('click', this.boundZoomOut);
+    document.getElementById('btn3dReset')?.addEventListener('click', this.boundResetView);
   }
 
-  updateCameraOrbit() {
+  private updateCameraOrbit(): void {
     if (this.isCameraAnimating) return;
 
     const x = this.targetCenter.x + this.cameraDistance * Math.sin(this.cameraPhi) * Math.sin(this.cameraTheta);
@@ -851,24 +944,35 @@ export class PiazzaScene3D {
     this.camera.lookAt(this.targetCenter);
   }
 
-  focusOnDay(dayNumber) {
+  focusOnDay(dayNumber: number): void {
     const data = ADVENT_DAYS.find(d => d.day === dayNumber);
     if (!data || !data.camTarget3d) return;
 
-    const startPos = this.camera.position.clone();
     const endPos = new THREE.Vector3(data.camTarget3d.x, data.camTarget3d.y, data.camTarget3d.z);
-
-    const startLook = this.targetCenter.clone();
     const endLook = new THREE.Vector3(data.camTarget3d.lookAt.x, data.camTarget3d.lookAt.y, data.camTarget3d.lookAt.z);
+
+    // If user prefers reduced motion: jump immediately without animation
+    if (this.prefersReducedMotion) {
+      this.camera.position.copy(endPos);
+      this.targetCenter.copy(endLook);
+      this.camera.lookAt(this.targetCenter);
+      const delta = this.camera.position.clone().sub(this.targetCenter);
+      this.cameraDistance = delta.length();
+      this.cameraPhi = Math.acos(delta.y / this.cameraDistance);
+      this.cameraTheta = Math.atan2(delta.x, delta.z);
+      return;
+    }
+
+    const startPos = this.camera.position.clone();
+    const startLook = this.targetCenter.clone();
 
     this.isCameraAnimating = true;
     const startTime = performance.now();
-    const duration = 1100; // ms
+    const duration = 1100;
 
-    const animateCam = (now) => {
+    const animateCam = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / duration);
-      // Smooth cubic easing
       const tVal = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
       this.camera.position.lerpVectors(startPos, endPos, tVal);
@@ -879,7 +983,6 @@ export class PiazzaScene3D {
         requestAnimationFrame(animateCam);
       } else {
         this.isCameraAnimating = false;
-        // Re-derive orbit parameters from final position
         const delta = this.camera.position.clone().sub(this.targetCenter);
         this.cameraDistance = delta.length();
         this.cameraPhi = Math.acos(delta.y / this.cameraDistance);
@@ -890,7 +993,7 @@ export class PiazzaScene3D {
     requestAnimationFrame(animateCam);
   }
 
-  resetView() {
+  resetView(): void {
     this.cameraDistance = 55;
     this.cameraTheta = Math.PI / 2;
     this.cameraPhi = Math.PI / 3.4;
@@ -898,26 +1001,32 @@ export class PiazzaScene3D {
     this.updateCameraOrbit();
   }
 
-  animate() {
+  private animate(): void {
     this.animId = requestAnimationFrame(() => this.animate());
 
     const now = performance.now();
     const delta = Math.min(0.1, (now - this.lastTime) / 1000);
     this.lastTime = now;
 
-    // 1. Subtle Skydome slow rotation (framerate independent)
-    if (this.skyMesh) {
+    // Monitor adaptive FPS in 'auto' quality mode
+    this.monitorAdaptiveFps(now);
+
+    // 1. Skydome slow rotation (freeze if reduced motion preferred)
+    if (this.skyMesh && !this.prefersReducedMotion) {
       this.skyMesh.rotation.y += 0.02 * delta;
     }
 
-    // 2. Volumetric 3D Snow drift simulation (framerate independent)
+    // 2. Volumetric 3D Snow drift simulation
     if (this.snowPoints) {
-      const positions = this.snowPoints.geometry.attributes.position.array;
+      const positions = (this.snowPoints.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
       const count = positions.length / 3;
+      const speedMultiplier = this.prefersReducedMotion ? 0.3 : 1.0;
 
       for (let i = 0; i < count; i++) {
-        positions[i * 3 + 1] -= this.snowSpeeds[i] * delta * 60; // Fall Y
-        positions[i * 3] += Math.sin(positions[i * 3 + 1] * 0.05) * 0.03 * delta * 60; // Gentle wind X
+        positions[i * 3 + 1] -= this.snowSpeeds[i] * delta * 60 * speedMultiplier;
+        if (!this.prefersReducedMotion) {
+          positions[i * 3] += Math.sin(positions[i * 3 + 1] * 0.05) * 0.03 * delta * 60;
+        }
 
         if (positions[i * 3 + 1] < 0) {
           positions[i * 3 + 1] = 60;
@@ -927,7 +1036,7 @@ export class PiazzaScene3D {
     }
 
     // 3. Tree Star sparkle rotation (Day 24)
-    if (this.treeStar && this.treeStar.visible) {
+    if (this.treeStar && this.treeStar.visible && !this.prefersReducedMotion) {
       this.treeStar.rotation.y += 0.02;
     }
 
@@ -938,9 +1047,171 @@ export class PiazzaScene3D {
     this.renderer.render(this.scene, this.camera);
   }
 
-  destroy() {
-    if (this.animId) cancelAnimationFrame(this.animId);
-    if (this.resizeObserver) this.resizeObserver.disconnect();
-    if (this.renderer) this.renderer.dispose();
+  public setQuality(level: QualityLevel): void {
+    storage.setQualityLevel(level);
+    this.applyCurrentQuality();
+  }
+
+  public applyCurrentQuality(): void {
+    const quality = this.getEffectiveQuality();
+    this.currentEffectiveQuality = quality;
+
+    if (!this.renderer) return;
+
+    const maxPixelRatio = quality === 'high' ? 2 : quality === 'medium' ? 1.25 : 1;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+    this.renderer.shadowMap.enabled = quality !== 'low';
+
+    // Dynamically adjust volumetric snow density
+    if (this.snowPoints) {
+      this.scene.remove(this.snowPoints);
+      this.snowPoints.geometry.dispose();
+      if (Array.isArray(this.snowPoints.material)) {
+        this.snowPoints.material.forEach((m) => m.dispose());
+      } else {
+        (this.snowPoints.material as THREE.Material).dispose();
+      }
+      this.buildVolumetricSnow();
+    }
+  }
+
+  private monitorAdaptiveFps(now: number): void {
+    if (storage.getQualityLevel() !== 'auto') return;
+
+    this.fpsFrames++;
+    const elapsed = now - this.fpsLastSample;
+    if (elapsed >= 1000) {
+      const fps = (this.fpsFrames * 1000) / elapsed;
+      this.fpsFrames = 0;
+      this.fpsLastSample = now;
+
+      if (fps < 28) {
+        this.lowFpsStreak++;
+        if (this.lowFpsStreak >= 2) {
+          if (this.currentEffectiveQuality === 'high') {
+            this.currentEffectiveQuality = 'medium';
+            this.applyQualityTier('medium');
+          } else if (this.currentEffectiveQuality === 'medium') {
+            this.currentEffectiveQuality = 'low';
+            this.applyQualityTier('low');
+          }
+          this.lowFpsStreak = 0;
+        }
+      } else {
+        this.lowFpsStreak = 0;
+      }
+    }
+  }
+
+  private applyQualityTier(quality: 'high' | 'medium' | 'low'): void {
+    if (!this.renderer) return;
+    const maxPixelRatio = quality === 'high' ? 2 : quality === 'medium' ? 1.25 : 1;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+    this.renderer.shadowMap.enabled = quality !== 'low';
+  }
+
+  private disposeMaterialTextures(material: THREE.Material): void {
+    if (!material) return;
+    const anyMat = material as unknown as Record<string, unknown>;
+    const textureKeys = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+      'emissiveMap', 'bumpMap', 'displacementMap', 'alphaMap',
+      'aoMap', 'lightMap', 'envMap'
+    ];
+    for (const key of textureKeys) {
+      const val = anyMat[key];
+      if (val && typeof (val as THREE.Texture).dispose === 'function') {
+        (val as THREE.Texture).dispose();
+      }
+    }
+  }
+
+  /**
+   * Complete, thorough resource disposal traversing scene graph,
+   * disposing geometries, materials, textures, removing all event listeners,
+   * disconnecting observers, and releasing WebGL GPU context.
+   */
+  destroy(): void {
+    if (this.animId !== null) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+
+    // Remove DOM event listeners
+    if (this.viewportEl) {
+      this.viewportEl.removeEventListener('mousedown', this.boundMouseDown);
+      this.viewportEl.removeEventListener('wheel', this.boundWheel);
+      this.viewportEl.removeEventListener('touchstart', this.boundTouchStart);
+    }
+    window.removeEventListener('mousemove', this.boundMouseMove);
+    window.removeEventListener('mouseup', this.boundMouseUp);
+    window.removeEventListener('touchmove', this.boundTouchMove);
+    window.removeEventListener('touchend', this.boundTouchEnd);
+    if (this.boundResize) {
+      window.removeEventListener('resize', this.boundResize);
+    }
+
+    const btnZoomIn = document.getElementById('btn3dZoomIn');
+    if (btnZoomIn && this.boundZoomIn) btnZoomIn.removeEventListener('click', this.boundZoomIn);
+    const btnZoomOut = document.getElementById('btn3dZoomOut');
+    if (btnZoomOut && this.boundZoomOut) btnZoomOut.removeEventListener('click', this.boundZoomOut);
+    const btnReset = document.getElementById('btn3dReset');
+    if (btnReset && this.boundResetView) btnReset.removeEventListener('click', this.boundResetView);
+
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+
+    if (this.mediaQueryListener) {
+      window.matchMedia('(prefers-reduced-motion: reduce)').removeEventListener('change', this.mediaQueryListener);
+      this.mediaQueryListener = null;
+    }
+
+    // Comprehensive Scene Graph Traversal & GPU Resource Cleanup
+    if (this.scene) {
+      this.scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points) {
+          if (obj.geometry) {
+            obj.geometry.dispose();
+          }
+
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((mat) => {
+              this.disposeMaterialTextures(mat);
+              mat.dispose();
+            });
+          } else if (obj.material) {
+            this.disposeMaterialTextures(obj.material);
+            obj.material.dispose();
+          }
+        }
+      });
+      this.scene.clear();
+    }
+
+    // Textures disposal
+    this.cobbleTex?.dispose();
+    this.cathedralTex?.dispose();
+    this.townhousesTex?.dispose();
+    this.skyTex?.dispose();
+
+    // KTX2 Loader disposal
+    if (this.ktx2Loader) {
+      this.ktx2Loader.dispose();
+      this.ktx2Loader = null;
+    }
+
+    // WebGL Renderer disposal & context loss
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+    }
+
+    // Clear hotspot tracking
+    this.hotspotElements.clear();
+    if (this.hotspotsOverlayEl) {
+      this.hotspotsOverlayEl.innerHTML = '';
+    }
   }
 }
