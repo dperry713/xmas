@@ -12,9 +12,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "compress-textures": "node scripts/compress-textures.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
     "typescript": "^5.7.0",

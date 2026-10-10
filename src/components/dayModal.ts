@@ -65,6 +65,25 @@ export class DayModal {
         this.navigate(-1);
       } else if (e.key === 'ArrowRight') {
         this.navigate(1);
+      } else if (e.key === 'Tab') {
+        const focusables = this.modalEl.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !this.modalEl.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !this.modalEl.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     });
   }

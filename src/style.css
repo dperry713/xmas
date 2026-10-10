@@ -51,7 +51,26 @@ html, body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure visitor text content is fully selectable and copyable */
+.day-modal-dialog,
+.day-modal-body,
+.calendar-drawer-panel,
+.modal-reflection-text,
+.modal-activity-text,
+.scripture-text,
+.header-brand {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Restrict selection only on interactive dragging surfaces */
+canvas,
+.piazza-view-controls,
+.studio-toggle-btn {
   user-select: none;
+  -webkit-user-select: none;
 }
 
 /* App Container */

@@ -1359,10 +1359,10 @@ export class PiazzaScene3D {
     const lang = storage.getLanguage();
 
     this.container.innerHTML = `
-      <div class="piazza-2d-viewport" id="piazza2dViewport" role="region" aria-label="Interactive 2D Advent Piazza Calendar">
+      <div class="piazza-2d-viewport" id="piazza2dViewport" role="region" aria-label="${t('drawerTitle', lang)}">
         <div class="piazza-fallback-banner" role="status" aria-live="polite">
-          <span class="fallback-badge">ℹ️ 2D ACCESSIBLE MODE</span>
-          <span>Accessible Illustrated Piazza view active (Keyboard & Screen Reader Optimized).</span>
+          <span class="fallback-badge">ℹ️ ${t('fallbackBadge', lang)}</span>
+          <span>${t('fallbackBanner', lang)}</span>
         </div>
         <div class="piazza-2d-canvas-wrapper">
           <img src="${base}assets/piazza_master.jpg" alt="Illustrated European Advent Piazza Square" class="piazza-2d-master-img" />
@@ -1385,13 +1385,13 @@ export class PiazzaScene3D {
                   class="piazza-2d-pin pin--${status} ${isToday ? 'pin--today' : ''}"
                   style="left: ${item.coordinates.x}%; top: ${item.coordinates.y}%;"
                   data-day="${item.day}"
-                  aria-label="Day ${item.day}: ${item.theme}. Status: ${statusText}. Location: ${item.location}"
+                  aria-label="${t('day', lang)} ${item.day}: ${item.theme}. ${t('status', lang)}: ${statusText}. ${t('location', lang)}: ${item.location}"
                   ${!isUnlocked ? 'aria-disabled="true"' : ''}
                 >
                   <span class="pin-badge">${item.day}</span>
                   ${badgeIcon ? `<span class="pin-sub-icon">${badgeIcon}</span>` : ''}
                   <span class="pin-tooltip">
-                    <span class="pin-tooltip-day">Day ${item.day}</span>
+                    <span class="pin-tooltip-day">${t('day', lang)} ${item.day}</span>
                     <span class="pin-tooltip-title">${item.theme}</span>
                   </span>
                 </button>
@@ -1431,7 +1431,7 @@ export class PiazzaScene3D {
       if (status === 'completed') statusText = t('statusCompleted', lang);
 
       btn.className = `piazza-2d-pin pin--${status} ${isToday ? 'pin--today' : ''}`;
-      btn.setAttribute('aria-label', `Day ${day}: ${item.theme}. Status: ${statusText}. Location: ${item.location}`);
+      btn.setAttribute('aria-label', `${t('day', lang)} ${day}: ${item.theme}. ${t('status', lang)}: ${statusText}. ${t('location', lang)}: ${item.location}`);
       btn.setAttribute('aria-disabled', isUnlocked ? 'false' : 'true');
 
       let badgeIcon = '';

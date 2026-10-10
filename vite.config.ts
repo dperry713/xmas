@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   base: './',
@@ -15,5 +15,9 @@ export default defineConfig({
   preview: {
     host: true,
     port: 4173,
+  },
+  test: {
+    include: ['tests/**/*.test.ts'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 });

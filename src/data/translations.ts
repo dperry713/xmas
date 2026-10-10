@@ -70,7 +70,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Piazza Warmth",
     piazzaProgress: "Piazza Awakening Progress",
     qualitySettings: "Graphic Quality",
-    reducedMotionBadge: "Reduced Motion Active"
+    reducedMotionBadge: "Reduced Motion Active",
+    open: "Open",
+    revisit: "Revisit",
+    status: "Status",
+    location: "Location",
+    fallbackBanner: "Accessible Illustrated Piazza view active (Keyboard & Screen Reader Optimized).",
+    fallbackBadge: "2D ACCESSIBLE MODE",
+    audioToggle: "Toggle ambient chimes"
   },
   es: {
     appTitle: "La Plaza de Adviento",
@@ -109,7 +116,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Calidez de la plaza",
     piazzaProgress: "Progreso del despertar de la plaza",
     qualitySettings: "Calidad gráfica",
-    reducedMotionBadge: "Movimiento reducido activo"
+    reducedMotionBadge: "Movimiento reducido activo",
+    open: "Abrir",
+    revisit: "Revisitar",
+    status: "Estado",
+    location: "Ubicación",
+    fallbackBanner: "Vista accesible de la plaza ilustrada activa (Optimizada para teclado y lectores de pantalla).",
+    fallbackBadge: "MODO ACCESIBLE 2D",
+    audioToggle: "Alternar campanadas ambientales"
   },
   fr: {
     appTitle: "La Piazza de l'Avent",
@@ -148,7 +162,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Chaleur de la Piazza",
     piazzaProgress: "Progression de la Piazza",
     qualitySettings: "Qualité graphique",
-    reducedMotionBadge: "Mouvements réduits actifs"
+    reducedMotionBadge: "Mouvements réduits actifs",
+    open: "Ouvrir",
+    revisit: "Revisiter",
+    status: "Statut",
+    location: "Lieu",
+    fallbackBanner: "Vue accessible de la piazza illustrée active (Optimisée pour clavier et lecteur d'écran).",
+    fallbackBadge: "MODE ACCESSIBLE 2D",
+    audioToggle: "Activer/désactiver le carillon"
   },
   de: {
     appTitle: "Die Advents-Piazza",
@@ -187,7 +208,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Piazza-Wärme",
     piazzaProgress: "Fortschritt der Piazza",
     qualitySettings: "Grafikqualität",
-    reducedMotionBadge: "Reduzierte Bewegung aktiv"
+    reducedMotionBadge: "Reduzierte Bewegung aktiv",
+    open: "Öffnen",
+    revisit: "Erneut ansehen",
+    status: "Status",
+    location: "Ort",
+    fallbackBanner: "Barrierefreie 2D-Piazza-Ansicht aktiv (Optimiert für Tastatur und Screenreader).",
+    fallbackBadge: "BARRIEREFREIER 2D-MODUS",
+    audioToggle: "Glocken ein/ausschalten"
   },
   it: {
     appTitle: "La Piazza d'Avvento",
@@ -226,7 +254,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Calore della Piazza",
     piazzaProgress: "Progresso risveglio Piazza",
     qualitySettings: "Qualità grafica",
-    reducedMotionBadge: "Movimento ridotto attivo"
+    reducedMotionBadge: "Movimento ridotto attivo",
+    open: "Apri",
+    revisit: "Rivedi",
+    status: "Stato",
+    location: "Luogo",
+    fallbackBanner: "Vista accessibile della piazza illustrata attiva (Ottimizzata per tastiera e screen reader).",
+    fallbackBadge: "MODALITÀ ACCESSIBILE 2D",
+    audioToggle: "Attiva/disattiva campane"
   },
   pt: {
     appTitle: "A Praça do Advento",
@@ -265,7 +300,14 @@ export const TRANSLATIONS: Record<string, TranslationDictionary> = {
     piazzaStatus: "Calor da Praça",
     piazzaProgress: "Progresso da Praça",
     qualitySettings: "Qualidade gráfica",
-    reducedMotionBadge: "Movimento reduzido ativo"
+    reducedMotionBadge: "Movimento reduzido ativo",
+    open: "Abrir",
+    revisit: "Revisitar",
+    status: "Status",
+    location: "Local",
+    fallbackBanner: "Visualização acessível da praça ilustrada ativa (Otimizada para teclado e leitores de tela).",
+    fallbackBadge: "MODO ACESSÍVEL 2D",
+    audioToggle: "Alternar sinos ambientais"
   }
 };
 

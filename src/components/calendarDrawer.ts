@@ -40,8 +40,29 @@ export class CalendarDrawer {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (this.isOpen && e.key === 'Escape') {
+      if (!this.isOpen) return;
+
+      if (e.key === 'Escape') {
         this.close();
+      } else if (e.key === 'Tab') {
+        const focusables = this.drawerEl.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !this.drawerEl.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !this.drawerEl.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     });
   }
@@ -133,9 +154,9 @@ export class CalendarDrawer {
                   class="card-open-btn ${!isUnlocked ? 'is-disabled' : ''}" 
                   ${!isUnlocked ? 'disabled' : ''}
                   data-day="${item.day}"
-                  aria-label="Open Day ${item.day}: ${item.theme}"
+                  aria-label="${isUnlocked ? (status === 'completed' ? t('revisit', lang) : t('open', lang)) : t('statusLocked', lang)} ${t('day', lang)} ${item.day}: ${item.theme}"
                 >
-                  ${isUnlocked ? (status === 'completed' ? 'Revisit' : 'Open') : 'Locked'}
+                  ${isUnlocked ? (status === 'completed' ? t('revisit', lang) : t('open', lang)) : t('statusLocked', lang)}
                 </button>
               </div>
             `;
