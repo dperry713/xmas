@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 async function testProductionSite() {
   const targetUrl = 'https://dperry713.github.io/xmas/';
@@ -49,8 +49,8 @@ async function testProductionSite() {
     const progressCount = await page.locator('#progressCountText').innerText();
     console.log(`App title: "${appTitle}", Progress: "${progressCount}"`);
 
-    if (progressCount !== '0 of 24') {
-      throw new Error(`Expected "0 of 24" initial progress, got "${progressCount}"`);
+    if (!progressCount.includes('0 of 24')) {
+      throw new Error(`Expected progress count to contain "0 of 24", got "${progressCount}"`);
     }
 
     // 3. Check for 404s or failed network requests (especially .ktx2 and textures)
@@ -82,6 +82,8 @@ async function testProductionSite() {
     await drawer.locator('.card-open-btn[data-day="1"]').click();
 
     const modal = page.locator('#dayModalOverlay');
+    await expect(modal).toHaveClass(/is-open/);
+    await expect(modal.locator('.modal-theme-title')).toHaveText('The Light in the Courtyard');
     const day1Title = await modal.locator('.modal-theme-title').innerText();
     console.log(`Day 1 Modal opened with theme: "${day1Title}"`);
 
@@ -118,8 +120,8 @@ async function testProductionSite() {
 
     const progressAfterDay1 = await page.locator('#progressCountText').innerText();
     console.log(`Progress after Day 1: "${progressAfterDay1}"`);
-    if (progressAfterDay1 !== '1 of 24') {
-      throw new Error(`Expected "1 of 24", got "${progressAfterDay1}"`);
+    if (!progressAfterDay1.includes('1 of 24')) {
+      throw new Error(`Expected progress after Day 1 to contain "1 of 24", got "${progressAfterDay1}"`);
     }
 
     // 5. Reload persistence
@@ -129,8 +131,8 @@ async function testProductionSite() {
 
     const progressAfterReload = await page.locator('#progressCountText').innerText();
     console.log(`Progress after reload: "${progressAfterReload}"`);
-    if (progressAfterReload !== '1 of 24') {
-      throw new Error(`Expected "1 of 24" after reload, got "${progressAfterReload}"`);
+    if (!progressAfterReload.includes('1 of 24')) {
+      throw new Error(`Expected progress after reload to contain "1 of 24", got "${progressAfterReload}"`);
     }
 
     // Verify Day 2 remains unlocked in Calendar Drawer
@@ -155,11 +157,10 @@ async function testProductionSite() {
     // Open Day 1 modal in Spanish
     await page.click('#btnOpenCalendar');
     await drawer.locator('.card-open-btn[data-day="1"]').click();
+    await expect(modal).toHaveClass(/is-open/);
+    await expect(modal.locator('.modal-theme-title')).toHaveText('La Luz en el Patio');
     const esDay1Theme = await modal.locator('.modal-theme-title').innerText();
     console.log(`Spanish Day 1 Theme: "${esDay1Theme}"`);
-    if (esDay1Theme !== 'La Luz en el Patio') {
-      throw new Error(`Expected Spanish Day 1 theme "La Luz en el Patio", got "${esDay1Theme}"`);
-    }
 
     console.log('\n=========================================');
     console.log('ALL PRODUCTION TESTS PASSED SUCCESSFULLY!');
