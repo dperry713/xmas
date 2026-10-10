@@ -45,7 +45,7 @@ export class CalendarDrawer {
     soundManager.playClick();
 
     setTimeout(() => {
-      this.drawerEl.querySelector('.drawer-close-btn')?.focus();
+      /** @type {HTMLElement|null} */ (this.drawerEl.querySelector('.drawer-close-btn'))?.focus();
     }, 50);
   }
 
@@ -69,7 +69,6 @@ export class CalendarDrawer {
   renderContent() {
     const lang = storage.getLanguage();
     const completedDays = storage.getCompletedDays();
-    const activeDay = dateGate.getActiveDay();
 
     this.drawerEl.innerHTML = `
       <div class="calendar-drawer-panel" role="document">
@@ -131,9 +130,10 @@ export class CalendarDrawer {
       this.close();
     });
 
-    this.drawerEl.querySelectorAll('.card-open-btn:not([disabled])').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        const day = parseInt(btn.dataset.day, 10);
+    this.drawerEl.querySelectorAll('.card-open-btn:not([disabled])').forEach((btnEl) => {
+      const btn = /** @type {HTMLElement} */ (btnEl);
+      btn.addEventListener('click', () => {
+        const day = parseInt(btn.dataset.day || '1', 10);
         this.close();
         this.onSelectDay(day);
       });

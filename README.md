@@ -1,45 +1,48 @@
-# The Advent Piazza — 24-Day Interactive Advent Calendar
+# The Advent Piazza — 24-Day Interactive 3D Advent Calendar
 
-A responsive, high-performance, mobile-first Advent Calendar web experience centered around an illustrated European town piazza that gradually awakens and warms up across December (Dec 1 – Dec 24).
+A responsive, high-performance, mobile-first 3D Advent Calendar web experience centered around an interactive 3D European town piazza that progressively awakens and develops across December (Dec 1 – Dec 24).
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Features & Engineering Highlights
 
-1. **Interactive European Piazza Scene**:
-   - Master illustrated backdrop with multi-layered progressive illumination (cathedral rose window, clock tower, street gas lamps, market stalls, tree lights, Star of Bethlehem).
-   - Dynamic canvas falling snow particle simulation.
-   - Smooth pan & drag exploration with touch gesture support (mobile/tablet/desktop) and on-screen zoom controls.
+1. **Full-Screen 3D European Piazza Scene**:
+   - Built with **Three.js** featuring high-fidelity architectural facade textures, wet cobblestones dusted with snow, and a 360° celestial twilight skydome.
+   - Smooth 360° orbit controls (mouse drag & touch gestures) with responsive distance clamping and smooth camera fly-to interpolation for all 24 landmarks.
+   - Framerate-independent volumetric 3D snow particle simulation.
+   - Framerate-independent celestial skydome rotation.
 
-2. **24 Date-Gated Moments**:
-   - Automatic unlocking based on December calendar dates (`Dec 1` through `Dec 24`).
-   - Hotspot states: `Locked` (future), `Available` (unlocked, pulsing halo), `Completed` (radiant star badge).
-   - Revisit previously unlocked days anytime.
+2. **Progressive 3D Awakening (Days 1–24)**:
+   - Day 1: North wrought-iron gas street lamp blazes to life with warm 3D dynamic point light.
+   - Day 2: Old Town Bakery glows with warm hearth fire.
+   - Day 3: Volumetric 3D snow storm settles over rooftops and cobblestones.
+   - Day 4: Central Stone Fountain illuminates with icy crystalline light and reflections.
+   - Day 5: Spiced Wassail / Cider market stall with striped awning and cauldrons.
+   - Day 8: Cathedral Rose Window illuminates from within with stained-glass radiance.
+   - Day 11: The Grand 3D Evergreen Christmas Tree is erected in the square, adorned with tiered snow frosting and reflective baubles.
+   - Day 19: 48 multi-colored sparkling fairy lights ignite across the entire Christmas tree.
+   - Day 23: Overhead canopy of light festoons connects the historic rooftops.
+   - Day 24: The blazing 3D Star of Bethlehem crowns the tree on Christmas Eve in triumphant illumination.
 
-3. **Daily Experience Modal Dialog**:
-   - Looping animated motion vignettes (SVG/CSS animations: flickering flame, baker's oven steam, cathedral rose window, swinging bells, star of Bethlehem, etc.).
-   - Scripture meditation, Daily Reflection, and practical Heart & Home activity.
-   - **"Complete & Awaken Piazza"** button: triggers celebration chimes and progressively awakens visual elements on the main piazza!
-   - **"Go Deeper"** link: direct link to existing Church resources, liturgies, and music.
+3. **Responsive 3D Hotspot Badges**:
+   - Screen-space projection anchored to 3D world space coordinates with distance-aware scaling (badges scale naturally as camera zooms in and out).
+   - Frustum and margin occlusion culling (hidden when behind camera or out of view).
+   - Accessible 44×44px minimum tap targets adhering to WCAG AAA touch guidelines.
 
-4. **Web Audio Generative Soundscape**:
-   - Built-in zero-dependency Web Audio API synthesizer for cathedral bell tolls, celebration sparkles, and UI taps.
-   - Instant response, zero latency, no external audio files required (with toggleable sound preference).
+4. **Daily Experience Modals**:
+   - 24 animated looping motion vignettes (SVG/CSS).
+   - Scripture meditation, daily reflection, and practical "Heart & Home" activity.
+   - "Complete & Awaken Piazza" button that triggers celebration audio and awakens the 3D scene.
+   - "Go Deeper" button linking directly to official Church resources.
 
-5. **Localisation Architecture (i18n)**:
-   - English master (`en`) + translations included for Spanish (`es`), French (`fr`), German (`de`), Italian (`it`), and Portuguese (`pt`).
-   - Modular dictionary ready for all 24 Church language versions in `src/data/translations.js`.
+5. **Audio Engine**:
+   - Procedural Web Audio API additive synthesis for cathedral bell tolls, celebration sparkles, and UI taps (zero external audio file latency).
 
-6. **Accessible Calendar Drawer**:
-   - Dedicated slide-out drawer accessible via the header for keyboard and screen-reader users or visitors who prefer structured list navigation.
-
-7. **Creative Studio Review Toolbar**:
-   - Docked expandable toolbar designed specifically for art directors, motion designers, and Church publishing teams:
-     - **Date Simulation Slider** (`Dec 1` to `Dec 24`).
-     - **"Studio Mode: Unlock All"** toggle.
-     - **Instant Language Switcher**.
-     - **Progress Reset** button.
-     - **Embed Mode Simulator**.
+6. **Studio Review & Publishing Toolbar**:
+   - Date simulation slider (`Dec 1` to `Dec 24`).
+   - "Studio Mode: Unlock All" instant review toggle.
+   - Instant language switcher (English master + Spanish, French, German, Italian, Portuguese, and scalable to 24 languages).
+   - Progress reset button and embed mode simulator.
 
 ---
 
@@ -48,23 +51,34 @@ A responsive, high-performance, mobile-first Advent Calendar web experience cent
 ```
 xmas/
 ├── index.html                     # HTML5 shell, Google Fonts, OpenGraph metadata
-├── package.json                   # Vite configuration
+├── package.json                   # Scripts, Vite, Three.js, Vitest & TypeScript
+├── tsconfig.json                  # TypeScript compiler options
+├── LICENSE                        # MIT License
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # GitHub Actions CI (typecheck, test, build)
+├── tests/
+│   └── advent.test.js             # Vitest test suite (dataset, date gate, i18n, storage)
 ├── public/
 │   └── assets/
-│       └── piazza_master.jpg      # Master illustrated European Piazza artwork
+│       ├── cobblestones.jpg       # High-fidelity cobblestones texture
+│       ├── cathedral_facade.jpg   # Gothic Cathedral architectural facade
+│       ├── townhouses_facade.jpg  # Medieval townhouses facade
+│       ├── sky_panorama.jpg       # Winter twilight sky panorama
+│       └── piazza_master.jpg      # Master illustration concept
 └── src/
-    ├── main.js                    # Application coordinator & routing
-    ├── style.css                  # Master CSS design system & responsive layout
+    ├── main.js                    # Application coordinator
+    ├── style.css                  # Responsive design system & 3D pin overlays
     ├── audio/
-    │   └── soundManager.js        # Web Audio API sound generator
+    │   └── soundManager.js        # Zero-dependency Web Audio synthesizer
     ├── components/
-    │   ├── piazzaScene.js         # Interactive scene, hotspots, snow canvas & pan/zoom
+    │   ├── piazzaScene3D.js       # Three.js 3D scene engine & progressive awakening
     │   ├── dayModal.js            # Daily experience dialog with reflections & actions
     │   ├── calendarDrawer.js      # Accessible 24-day slide-out list drawer
     │   ├── studioBar.js           # Studio testing toolbar for date simulation
     │   └── vignettes.js           # 24 looping animated motion vignettes
     ├── data/
-    │   ├── adventDays.js          # Master 24-day content, coordinates & church links
+    │   ├── adventDays.js          # Master 24-day dataset with 3D coordinates & church links
     │   └── translations.js        # i18n localization dictionary (24 languages)
     └── services/
         ├── dateGate.js            # December date gating & unlock rules
@@ -82,21 +96,21 @@ npm install
 # Start local development server
 npm run dev
 
+# Run unit & smoke tests
+npm test
+
+# Run TypeScript type check
+npm run typecheck
+
 # Build production bundle
 npm run build
 ```
 
-Production build generates lightweight static assets in `dist/` ready to be hosted on any static hosting environment (AWS S3, Netlify, Cloudflare Pages, Azure, or Church CMS servers).
-
 ---
 
-## 📦 Deployment & Embedding Options
+## 📦 Embedding into Church Webpages
 
-### Option A: Standalone Hosting
-Host the contents of `dist/` directly at a URL (e.g. `https://advent.church.org/`).
-
-### Option B: iFrame Embedding into Existing Church Webpages
-Embed into an existing CMS page using standard responsive iframe:
+Embed into any Church CMS page using standard responsive iframe:
 ```html
 <iframe 
   src="https://advent.church.org/?embedded=true" 
@@ -111,13 +125,6 @@ Appending `?embedded=true` automatically streamlines the header padding for embe
 
 ---
 
-## 🎨 Asset Replacement Guide for the Studio
+## 📄 License
 
-1. **Replacing the Master Illustration**:
-   - Replace `public/assets/piazza_master.jpg` with the studio's final illustration (recommended dimensions: 2560x1440 or 1920x1080).
-2. **Fine-Tuning Hotspot Coordinates**:
-   - In `src/data/adventDays.js`, adjust the `coordinates: { x: X%, y: Y% }` values to align badges precisely with illustrated landmarks.
-3. **Supplying Custom Animation / Lottie / Video**:
-   - In `src/components/vignettes.js`, replace or wrap the SVG functions with Lottie player containers or `<video autoplay loop muted playsinline>` elements as motion assets are delivered.
-4. **Updating Church Content & "Go Deeper" Links**:
-   - In `src/data/adventDays.js`, update `goDeeperUrl` and `goDeeperLabel` for each day.
+MIT License — see [LICENSE](file:///c:/Users/d/OneDrive/Desktop/xmas/LICENSE) for details.

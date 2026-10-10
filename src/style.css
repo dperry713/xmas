@@ -227,8 +227,10 @@ html, body {
   pointer-events: auto;
   border: none;
   background: transparent;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -236,6 +238,7 @@ html, body {
   transition: transform 0.15s ease, filter 0.2s ease;
   outline: none;
   will-change: transform;
+  touch-action: manipulation;
 }
 
 .piazza-3d-pin:focus-visible {

@@ -14,7 +14,7 @@ class SoundManager {
 
   initContext() {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const AudioCtx = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }

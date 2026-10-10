@@ -112,26 +112,31 @@ export class StudioBar {
 
     const simSlider = document.getElementById('simDateSlider');
     simSlider?.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      document.getElementById('simValLabel').textContent = `Dec ${val}`;
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      const val = parseInt(input.value, 10);
+      const label = document.getElementById('simValLabel');
+      if (label) label.textContent = `Dec ${val}`;
       storage.setSimulatedDay(val);
       this.onStateChanged();
     });
 
     document.getElementById('toggleUnlockAll')?.addEventListener('change', (e) => {
-      storage.setUnlockAll(e.target.checked);
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      storage.setUnlockAll(input.checked);
       soundManager.playClick();
       this.onStateChanged();
     });
 
     document.getElementById('selectLanguage')?.addEventListener('change', (e) => {
-      storage.setLanguage(e.target.value);
+      const select = /** @type {HTMLSelectElement} */ (e.target);
+      storage.setLanguage(select.value);
       this.onStateChanged();
     });
 
     document.getElementById('toggleSound')?.addEventListener('change', (e) => {
-      storage.setSoundEnabled(e.target.checked);
-      if (e.target.checked) soundManager.playBell(520);
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      storage.setSoundEnabled(input.checked);
+      if (input.checked) soundManager.playBell(520);
     });
 
     document.getElementById('btnResetStorage')?.addEventListener('click', () => {

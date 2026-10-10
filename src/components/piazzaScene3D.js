@@ -17,7 +17,7 @@ export class PiazzaScene3D {
     this.onSelectDay = onSelectDay;
 
     this.animId = null;
-    this.clock = new THREE.Clock();
+    this.lastTime = performance.now();
     this.awakenedObjects = new Map();
     this.hotspotElements = new Map();
 
@@ -125,23 +125,26 @@ export class PiazzaScene3D {
 
   loadTextures() {
     this.textureLoader = new THREE.TextureLoader();
+    const base = import.meta.env.BASE_URL.endsWith('/')
+      ? import.meta.env.BASE_URL
+      : import.meta.env.BASE_URL + '/';
 
     // Cobblestone pavement
-    this.cobbleTex = this.textureLoader.load('/assets/cobblestones.jpg');
+    this.cobbleTex = this.textureLoader.load(base + 'assets/cobblestones.jpg');
     this.cobbleTex.wrapS = THREE.RepeatWrapping;
     this.cobbleTex.wrapT = THREE.RepeatWrapping;
     this.cobbleTex.repeat.set(28, 28);
 
     // Cathedral Gothic Facade
-    this.cathedralTex = this.textureLoader.load('/assets/cathedral_facade.jpg');
+    this.cathedralTex = this.textureLoader.load(base + 'assets/cathedral_facade.jpg');
 
     // Historic Townhouses
-    this.townhousesTex = this.textureLoader.load('/assets/townhouses_facade.jpg');
+    this.townhousesTex = this.textureLoader.load(base + 'assets/townhouses_facade.jpg');
     this.townhousesTex.wrapS = THREE.RepeatWrapping;
     this.townhousesTex.repeat.set(2, 1);
 
     // Sky Panorama Dome
-    this.skyTex = this.textureLoader.load('/assets/sky_panorama.jpg');
+    this.skyTex = this.textureLoader.load(base + 'assets/sky_panorama.jpg');
   }
 
   buildWorld() {
@@ -370,18 +373,41 @@ export class PiazzaScene3D {
     this.treeGroup = new THREE.Group();
     this.treeGroup.position.set(0, 0, -12);
 
-    // Multi-tiered foliage cones
+    // Multi-tiered foliage cones with snow caps and baubles
     const foliageMat = new THREE.MeshStandardMaterial({ color: 0x064e3b, roughness: 0.7 });
+    const snowCapMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+    const redBaubleMat = new THREE.MeshStandardMaterial({ color: 0xd90429, metalness: 0.85, roughness: 0.2 });
+    const goldBaubleMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.15 });
+
     const tierHeights = [7, 6, 5, 4];
     const tierRadii = [6.5, 5.2, 3.8, 2.4];
     let yOffset = 2;
 
     for (let i = 0; i < 4; i++) {
-      const coneGeo = new THREE.ConeGeometry(tierRadii[i], tierHeights[i], 12);
+      const coneGeo = new THREE.ConeGeometry(tierRadii[i], tierHeights[i], 16);
       const cone = new THREE.Mesh(coneGeo, foliageMat);
       cone.position.y = yOffset + tierHeights[i] / 2;
       cone.castShadow = true;
       this.treeGroup.add(cone);
+
+      // Snow frosting ring on tier ledge
+      const snowRingGeo = new THREE.TorusGeometry(tierRadii[i] * 0.95, 0.35, 6, 16);
+      const snowRing = new THREE.Mesh(snowRingGeo, snowCapMat);
+      snowRing.rotation.x = Math.PI / 2;
+      snowRing.position.y = yOffset + 0.3;
+      this.treeGroup.add(snowRing);
+
+      // Decorative baubles around each tier
+      const baubleCount = 6 + i * 2;
+      for (let b = 0; b < baubleCount; b++) {
+        const bAngle = (b / baubleCount) * Math.PI * 2;
+        const bRad = tierRadii[i] * 0.88;
+        const bGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        const bMesh = new THREE.Mesh(bGeo, b % 2 === 0 ? redBaubleMat : goldBaubleMat);
+        bMesh.position.set(Math.cos(bAngle) * bRad, yOffset + 0.8, Math.sin(bAngle) * bRad);
+        this.treeGroup.add(bMesh);
+      }
+
       yOffset += tierHeights[i] * 0.7;
     }
 
@@ -616,7 +642,7 @@ export class PiazzaScene3D {
       const badge = document.createElement('button');
       badge.type = 'button';
       badge.className = `piazza-3d-pin pin--${status} ${isToday ? 'pin--today' : ''}`;
-      badge.dataset.day = data.day;
+      badge.dataset.day = String(data.day);
       badge.setAttribute('role', 'button');
 
       let statusText = t('statusLocked', lang);
@@ -659,11 +685,11 @@ export class PiazzaScene3D {
     const halfWidth = this.viewportEl.clientWidth / 2;
     const halfHeight = this.viewportEl.clientHeight / 2;
 
-    this.hotspotElements.forEach(({ element, pos3d }, day) => {
+    this.hotspotElements.forEach(({ element, pos3d }) => {
       // Project 3D vector into Normalized Device Coordinates (NDC)
       const projected = pos3d.clone().project(this.camera);
 
-      // Check if behind camera or outside frustum
+      // Check if behind camera or outside near frustum
       if (projected.z > 1.0) {
         element.style.display = 'none';
         return;
@@ -672,8 +698,18 @@ export class PiazzaScene3D {
       const screenX = (projected.x * halfWidth) + halfWidth;
       const screenY = -(projected.y * halfHeight) + halfHeight;
 
+      // Distance-aware dynamic scaling: smooth scaling based on camera distance
+      const dist = pos3d.distanceTo(this.camera.position);
+      const scale = Math.max(0.72, Math.min(1.22, 55 / dist));
+
+      // Viewport margin culling
+      if (dist > 180 || screenX < -40 || screenX > (halfWidth * 2 + 40) || screenY < -40 || screenY > (halfHeight * 2 + 40)) {
+        element.style.display = 'none';
+        return;
+      }
+
       element.style.display = 'flex';
-      element.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%)`;
+      element.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%) scale(${scale.toFixed(2)})`;
     });
   }
 
@@ -712,7 +748,8 @@ export class PiazzaScene3D {
   initControls() {
     // Mouse Drag Rotation
     this.viewportEl.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.piazza-3d-pin') || e.target.closest('.view-ctrl-btn')) return;
+      const target = /** @type {HTMLElement|null} */ (e.target);
+      if (target?.closest?.('.piazza-3d-pin') || target?.closest?.('.view-ctrl-btn')) return;
       this.isDragging = true;
       this.previousMousePosition = { x: e.clientX, y: e.clientY };
       document.getElementById('piazza3dHint')?.classList.add('is-dismissed');
@@ -864,21 +901,23 @@ export class PiazzaScene3D {
   animate() {
     this.animId = requestAnimationFrame(() => this.animate());
 
-    const delta = this.clock.getDelta();
+    const now = performance.now();
+    const delta = Math.min(0.1, (now - this.lastTime) / 1000);
+    this.lastTime = now;
 
-    // 1. Subtle Skydome slow rotation
+    // 1. Subtle Skydome slow rotation (framerate independent)
     if (this.skyMesh) {
-      this.skyMesh.rotation.y += 0.0004;
+      this.skyMesh.rotation.y += 0.02 * delta;
     }
 
-    // 2. Volumetric 3D Snow drift simulation
+    // 2. Volumetric 3D Snow drift simulation (framerate independent)
     if (this.snowPoints) {
       const positions = this.snowPoints.geometry.attributes.position.array;
       const count = positions.length / 3;
 
       for (let i = 0; i < count; i++) {
-        positions[i * 3 + 1] -= this.snowSpeeds[i]; // Fall Y
-        positions[i * 3] += Math.sin(positions[i * 3 + 1] * 0.05) * 0.03; // Gentle wind X
+        positions[i * 3 + 1] -= this.snowSpeeds[i] * delta * 60; // Fall Y
+        positions[i * 3] += Math.sin(positions[i * 3 + 1] * 0.05) * 0.03 * delta * 60; // Gentle wind X
 
         if (positions[i * 3 + 1] < 0) {
           positions[i * 3 + 1] = 60;

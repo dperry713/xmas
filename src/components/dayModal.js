@@ -73,7 +73,7 @@ export class DayModal {
 
     // Focus close button for accessibility
     setTimeout(() => {
-      const closeBtn = this.modalEl.querySelector('.modal-close-btn');
+      const closeBtn = /** @type {HTMLElement|null} */ (this.modalEl.querySelector('.modal-close-btn'));
       if (closeBtn) closeBtn.focus();
     }, 50);
 
@@ -88,8 +88,8 @@ export class DayModal {
     this.isOpen = false;
     document.body.classList.remove('modal-open');
 
-    if (this.previouslyFocusedEl && typeof this.previouslyFocusedEl.focus === 'function') {
-      this.previouslyFocusedEl.focus();
+    if (this.previouslyFocusedEl && 'focus' in this.previouslyFocusedEl) {
+      /** @type {HTMLElement} */ (this.previouslyFocusedEl).focus();
     }
   }
 
