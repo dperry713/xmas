@@ -68,12 +68,15 @@ export class AdventApp {
       }
     });
 
-    // 4. Initialize Studio Review Toolbar
+    // 4. Initialize Studio Review Toolbar with Live Profiler & 2D fallback
     this.studioBar = new StudioBar({
       container: appContainer,
       onStateChanged: () => {
         this.updateAllComponents();
-      }
+      },
+      getPerformanceMetrics: () => this.piazzaScene.getPerformanceMetrics(),
+      toggle2DFallback: () => this.piazzaScene.toggle2DFallback(),
+      is2DMode: () => this.piazzaScene.is2DMode()
     });
 
     // 5. Bind Header Controls
@@ -174,6 +177,7 @@ export class AdventApp {
    * Graceful tear-down
    */
   public destroy(): void {
+    this.studioBar.destroy();
     this.piazzaScene.destroy();
   }
 }

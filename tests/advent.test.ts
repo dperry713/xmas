@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ADVENT_DAYS } from '../src/data/adventDays';
 import { SUPPORTED_LANGUAGES, t } from '../src/data/translations';
 import { dateGate } from '../src/services/dateGate';
-import { storage } from '../src/services/storage';
+import { storage, validateStorageState } from '../src/services/storage';
 import type { QualityLevel } from '../src/types/advent';
 
 describe('Advent Calendar Dataset', () => {
@@ -111,6 +111,44 @@ describe('Storage Service & Adaptive Quality Preferences', () => {
       storage.setQualityLevel(lvl);
       expect(storage.getQualityLevel()).toBe(lvl);
     });
+  });
+
+  it('should reject invalid or out-of-bounds days', () => {
+    storage.markDayCompleted(0);
+    storage.markDayCompleted(25);
+    storage.markDayCompleted(-5);
+    expect(storage.getCompletedDays()).not.toContain(0);
+    expect(storage.getCompletedDays()).not.toContain(25);
+    expect(storage.getCompletedDays()).not.toContain(-5);
+  });
+
+  it('should validate and sanitize corrupted storage data safely', () => {
+    const corruptedInput = {
+      completedDays: [-1, 0, 1, 2, 99, 'foo', null],
+      visitedDays: [25, 24, 1],
+      soundEnabled: 'not-a-bool',
+      lang: 'INVALID_LANGUAGE_123',
+      simulatedDay: 999,
+      unlockAll: 'yes',
+      qualityLevel: 'ultra-hd'
+    };
+    const sanitized = validateStorageState(corruptedInput);
+    expect(sanitized.version).toBe(2);
+    expect(sanitized.completedDays).toEqual([1, 2]);
+    expect(sanitized.visitedDays).toEqual([1, 24]);
+    expect(sanitized.soundEnabled).toBe(true);
+    expect(sanitized.lang).toBe('en');
+    expect(sanitized.simulatedDay).toBeNull();
+    expect(sanitized.unlockAll).toBe(false);
+    expect(sanitized.qualityLevel).toBe('auto');
+  });
+
+  it('should handle completely invalid non-object raw data', () => {
+    expect(validateStorageState(null)).toBeDefined();
+    expect(validateStorageState(undefined)).toBeDefined();
+    expect(validateStorageState('corrupted string')).toBeDefined();
+    expect(validateStorageState(42)).toBeDefined();
+    expect(validateStorageState([])).toBeDefined();
   });
 });
 

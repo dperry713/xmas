@@ -38,9 +38,18 @@ export class CalendarDrawer {
         this.close();
       }
     });
+
+    window.addEventListener('keydown', (e) => {
+      if (this.isOpen && e.key === 'Escape') {
+        this.close();
+      }
+    });
   }
 
+  private previouslyFocusedEl: HTMLElement | null = null;
+
   open(): void {
+    this.previouslyFocusedEl = document.activeElement as HTMLElement | null;
     this.renderContent();
     this.drawerEl.classList.add('is-open');
     this.drawerEl.setAttribute('aria-hidden', 'false');
@@ -60,6 +69,11 @@ export class CalendarDrawer {
     this.isOpen = false;
     document.body.classList.remove('drawer-open');
     soundManager.playClick();
+
+    if (this.previouslyFocusedEl) {
+      this.previouslyFocusedEl.focus();
+      this.previouslyFocusedEl = null;
+    }
   }
 
   toggle(): void {

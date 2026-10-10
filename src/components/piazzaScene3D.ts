@@ -13,6 +13,19 @@ import { t } from '../data/translations';
 import { soundManager } from '../audio/soundManager';
 import type { QualityLevel } from '../types/advent';
 
+export interface PerformanceMetrics {
+  fps: number;
+  frameTimeMs: number;
+  targetFrameBudgetMs: number;
+  drawCalls: number;
+  triangles: number;
+  textures: number;
+  geometries: number;
+  quality: 'high' | 'medium' | 'low';
+  is2DFallback: boolean;
+  budgetStatus: 'pass' | 'warn' | 'fail';
+}
+
 export class PiazzaScene3D {
   private container: HTMLElement;
   private onSelectDay: (day: number) => void;
@@ -21,6 +34,11 @@ export class PiazzaScene3D {
   private lastTime: number = performance.now();
   private awakenedObjects = new Map<number, { activate: () => void; deactivate: () => void }>();
   private hotspotElements = new Map<number, { element: HTMLElement; pos3d: THREE.Vector3 }>();
+
+  // Fallback and Performance tracking
+  private is2DFallbackActive: boolean = false;
+  private lastRenderDurationMs: number = 16.6;
+  private currentCalculatedFps: number = 60;
 
   // Three.js Core
   private scene!: THREE.Scene;
@@ -100,6 +118,7 @@ export class PiazzaScene3D {
   }
 
   private checkReducedMotion(): void {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.prefersReducedMotion = mq.matches;
 
@@ -109,15 +128,40 @@ export class PiazzaScene3D {
     mq.addEventListener('change', this.mediaQueryListener);
   }
 
+  public isWebGLAvailable(): boolean {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(
+        typeof window !== 'undefined' &&
+        window.WebGLRenderingContext &&
+        (canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+      );
+    } catch {
+      return false;
+    }
+  }
+
   private init(): void {
-    this.renderDOM();
-    this.initThree();
-    this.loadTextures();
-    this.buildWorld();
-    this.build3DHotspots();
-    this.initControls();
-    this.updateAtmosphere();
-    this.animate();
+    if (!this.isWebGLAvailable()) {
+      console.warn('WebGL is unavailable: activating accessible 2D fallback mode.');
+      this.activate2DFallback();
+      return;
+    }
+
+    try {
+      this.is2DFallbackActive = false;
+      this.renderDOM();
+      this.initThree();
+      this.loadTextures();
+      this.buildWorld();
+      this.build3DHotspots();
+      this.initControls();
+      this.updateAtmosphere();
+      this.animate();
+    } catch (err) {
+      console.error('Three.js 3D initialization failed, falling back to accessible 2D view:', err);
+      this.activate2DFallback();
+    }
   }
 
   private renderDOM(): void {
@@ -194,7 +238,10 @@ export class PiazzaScene3D {
     // 4. KTX2 / Compressed Texture Pipeline initialization
     try {
       this.ktx2Loader = new KTX2Loader();
-      this.ktx2Loader.setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/libs/basis/');
+      const base = import.meta.env.BASE_URL.endsWith('/')
+        ? import.meta.env.BASE_URL
+        : import.meta.env.BASE_URL + '/';
+      this.ktx2Loader.setTranscoderPath(base + 'basis/');
       this.ktx2Loader.detectSupport(this.renderer);
     } catch (err) {
       console.warn('KTX2Loader initialization skipped:', err);
@@ -246,7 +293,11 @@ export class PiazzaScene3D {
   /**
    * KTX2 / Compressed Texture Pipeline loader with automatic JPEG/PNG fallback
    */
-  private loadTextureWithKTX2Fallback(standardPath: string, repeat?: { x: number; y: number }): THREE.Texture {
+  private loadTextureWithKTX2Fallback(
+    standardPath: string,
+    repeat?: { x: number; y: number },
+    onMaterialApply?: (texture: THREE.Texture) => void
+  ): THREE.Texture {
     const tex = this.textureLoader.load(standardPath);
     if (repeat) {
       tex.wrapS = THREE.RepeatWrapping;
@@ -264,8 +315,10 @@ export class PiazzaScene3D {
             ktxTexture.wrapT = THREE.RepeatWrapping;
             ktxTexture.repeat.set(repeat.x, repeat.y);
           }
-          (tex as unknown as THREE.CompressedTexture).copy(ktxTexture);
-          tex.needsUpdate = true;
+          ktxTexture.needsUpdate = true;
+          if (onMaterialApply) {
+            onMaterialApply(ktxTexture);
+          }
         },
         undefined,
         () => {
@@ -932,6 +985,11 @@ export class PiazzaScene3D {
   }
 
   updateAtmosphere(): void {
+    if (this.is2DFallbackActive) {
+      this.update2DFallbackAtmosphere();
+      return;
+    }
+
     const completedDays = storage.getCompletedDays();
     const unlockAll = storage.getUnlockAll();
     const count = completedDays.length;
@@ -1075,6 +1133,12 @@ export class PiazzaScene3D {
   }
 
   focusOnDay(dayNumber: number): void {
+    if (this.is2DFallbackActive) {
+      const pin = this.container.querySelector(`.piazza-2d-pin[data-day="${dayNumber}"]`) as HTMLElement | null;
+      pin?.focus();
+      return;
+    }
+
     const data = ADVENT_DAYS.find(d => d.day === dayNumber);
     if (!data || !data.camTarget3d) return;
 
@@ -1173,8 +1237,10 @@ export class PiazzaScene3D {
     // 4. Update screen projections for 3D hotspot badges
     this.updateHotspotsScreenProjection();
 
-    // 5. Render Scene
+    // 5. Render Scene & track frame render time
+    const t0 = performance.now();
     this.renderer.render(this.scene, this.camera);
+    this.lastRenderDurationMs = performance.now() - t0;
   }
 
   public setQuality(level: QualityLevel): void {
@@ -1206,14 +1272,15 @@ export class PiazzaScene3D {
   }
 
   private monitorAdaptiveFps(now: number): void {
-    if (storage.getQualityLevel() !== 'auto') return;
-
     this.fpsFrames++;
     const elapsed = now - this.fpsLastSample;
     if (elapsed >= 1000) {
       const fps = (this.fpsFrames * 1000) / elapsed;
+      this.currentCalculatedFps = fps;
       this.fpsFrames = 0;
       this.fpsLastSample = now;
+
+      if (storage.getQualityLevel() !== 'auto') return;
 
       if (fps < 28) {
         this.lowFpsStreak++;
@@ -1254,6 +1321,162 @@ export class PiazzaScene3D {
         (val as THREE.Texture).dispose();
       }
     }
+  }
+
+  public is2DMode(): boolean {
+    return this.is2DFallbackActive;
+  }
+
+  public toggle2DFallback(force?: boolean): void {
+    const targetState = force !== undefined ? force : !this.is2DFallbackActive;
+    if (targetState === this.is2DFallbackActive) return;
+
+    if (targetState) {
+      this.destroy();
+      this.activate2DFallback();
+    } else {
+      if (!this.isWebGLAvailable()) {
+        alert('WebGL 3D hardware acceleration is not supported on this browser or device.');
+        return;
+      }
+      this.is2DFallbackActive = false;
+      this.container.innerHTML = '';
+      this.init();
+    }
+  }
+
+  private activate2DFallback(): void {
+    this.is2DFallbackActive = true;
+    if (this.animId !== null) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+
+    const base = import.meta.env.BASE_URL.endsWith('/')
+      ? import.meta.env.BASE_URL
+      : import.meta.env.BASE_URL + '/';
+
+    const lang = storage.getLanguage();
+
+    this.container.innerHTML = `
+      <div class="piazza-2d-viewport" id="piazza2dViewport" role="region" aria-label="Interactive 2D Advent Piazza Calendar">
+        <div class="piazza-fallback-banner" role="status" aria-live="polite">
+          <span class="fallback-badge">ℹ️ 2D ACCESSIBLE MODE</span>
+          <span>Accessible Illustrated Piazza view active (Keyboard & Screen Reader Optimized).</span>
+        </div>
+        <div class="piazza-2d-canvas-wrapper">
+          <img src="${base}assets/piazza_master.jpg" alt="Illustrated European Advent Piazza Square" class="piazza-2d-master-img" />
+          <div class="piazza-2d-hotspots-overlay" id="piazza2dHotspotsOverlay" role="group" aria-label="Advent Day Hotspots">
+            ${ADVENT_DAYS.map((item) => {
+              const status = dateGate.getDayStatus(item.day);
+              const isToday = dateGate.isToday(item.day);
+              const isUnlocked = status !== 'locked';
+              let badgeIcon = '';
+              if (status === 'locked') badgeIcon = '🔒';
+              if (status === 'completed') badgeIcon = '⭐';
+
+              let statusText = t('statusLocked', lang);
+              if (status === 'available') statusText = isToday ? t('todayBadge', lang) : t('statusAvailable', lang);
+              if (status === 'completed') statusText = t('statusCompleted', lang);
+
+              return `
+                <button
+                  type="button"
+                  class="piazza-2d-pin pin--${status} ${isToday ? 'pin--today' : ''}"
+                  style="left: ${item.coordinates.x}%; top: ${item.coordinates.y}%;"
+                  data-day="${item.day}"
+                  aria-label="Day ${item.day}: ${item.theme}. Status: ${statusText}. Location: ${item.location}"
+                  ${!isUnlocked ? 'aria-disabled="true"' : ''}
+                >
+                  <span class="pin-badge">${item.day}</span>
+                  ${badgeIcon ? `<span class="pin-sub-icon">${badgeIcon}</span>` : ''}
+                  <span class="pin-tooltip">
+                    <span class="pin-tooltip-day">Day ${item.day}</span>
+                    <span class="pin-tooltip-title">${item.theme}</span>
+                  </span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bind click & keyboard handlers to all 2D pins
+    this.container.querySelectorAll('.piazza-2d-pin').forEach((btnEl) => {
+      const btn = btnEl as HTMLElement;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        soundManager.playClick();
+        const day = parseInt(btn.dataset.day || '1', 10);
+        this.onSelectDay(day);
+      });
+    });
+  }
+
+  private update2DFallbackAtmosphere(): void {
+    const lang = storage.getLanguage();
+    this.container.querySelectorAll('.piazza-2d-pin').forEach((btnEl) => {
+      const btn = btnEl as HTMLElement;
+      const day = parseInt(btn.dataset.day || '1', 10);
+      const item = ADVENT_DAYS[day - 1];
+      if (!item) return;
+
+      const status = dateGate.getDayStatus(day);
+      const isToday = dateGate.isToday(day);
+      const isUnlocked = status !== 'locked';
+
+      let statusText = t('statusLocked', lang);
+      if (status === 'available') statusText = isToday ? t('todayBadge', lang) : t('statusAvailable', lang);
+      if (status === 'completed') statusText = t('statusCompleted', lang);
+
+      btn.className = `piazza-2d-pin pin--${status} ${isToday ? 'pin--today' : ''}`;
+      btn.setAttribute('aria-label', `Day ${day}: ${item.theme}. Status: ${statusText}. Location: ${item.location}`);
+      btn.setAttribute('aria-disabled', isUnlocked ? 'false' : 'true');
+
+      let badgeIcon = '';
+      if (status === 'locked') badgeIcon = '🔒';
+      if (status === 'completed') badgeIcon = '⭐';
+
+      let subIcon = btn.querySelector('.pin-sub-icon');
+      if (badgeIcon && !subIcon) {
+        subIcon = document.createElement('span');
+        subIcon.className = 'pin-sub-icon';
+        btn.appendChild(subIcon);
+      }
+      if (subIcon) {
+        subIcon.textContent = badgeIcon;
+      }
+    });
+  }
+
+  public getPerformanceMetrics(): PerformanceMetrics {
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const targetFps = isMobile ? 30 : 60;
+    const currentFps = this.is2DFallbackActive ? 60 : (this.currentCalculatedFps || 60);
+    const frameTime = this.is2DFallbackActive ? 0.5 : Number(this.lastRenderDurationMs.toFixed(1));
+
+    let budgetStatus: 'pass' | 'warn' | 'fail' = 'pass';
+    if (!this.is2DFallbackActive) {
+      if (currentFps < targetFps * 0.5) {
+        budgetStatus = 'fail';
+      } else if (currentFps < targetFps * 0.85) {
+        budgetStatus = 'warn';
+      }
+    }
+
+    return {
+      fps: Math.round(currentFps),
+      frameTimeMs: frameTime,
+      targetFrameBudgetMs: isMobile ? 33.3 : 16.6,
+      drawCalls: this.renderer?.info?.render?.calls || 0,
+      triangles: this.renderer?.info?.render?.triangles || 0,
+      textures: this.renderer?.info?.memory?.textures || 0,
+      geometries: this.renderer?.info?.memory?.geometries || 0,
+      quality: this.currentEffectiveQuality,
+      is2DFallback: this.is2DFallbackActive,
+      budgetStatus
+    };
   }
 
   /**

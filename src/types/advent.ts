@@ -58,6 +58,7 @@ export interface TranslationDictionary {
 }
 
 export interface StorageState {
+  version?: number;
   completedDays: number[];
   visitedDays: number[];
   soundEnabled: boolean;

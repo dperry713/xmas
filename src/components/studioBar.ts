@@ -9,16 +9,32 @@ import { storage } from '../services/storage';
 import { dateGate } from '../services/dateGate';
 import { soundManager } from '../audio/soundManager';
 import type { QualityLevel } from '../types/advent';
+import type { PerformanceMetrics } from './piazzaScene3D';
+
+export interface StudioBarOptions {
+  container: HTMLElement;
+  onStateChanged: () => void;
+  getPerformanceMetrics?: () => PerformanceMetrics;
+  toggle2DFallback?: () => void;
+  is2DMode?: () => boolean;
+}
 
 export class StudioBar {
   private container: HTMLElement;
   private onStateChanged: () => void;
+  private getPerformanceMetrics?: () => PerformanceMetrics;
+  private toggle2DFallback?: () => void;
+  private is2DMode?: () => boolean;
   public isExpanded: boolean = false;
   private barEl!: HTMLElement;
+  private hudIntervalId: number | null = null;
 
-  constructor({ container, onStateChanged }: { container: HTMLElement; onStateChanged: () => void }) {
-    this.container = container;
-    this.onStateChanged = onStateChanged;
+  constructor(options: StudioBarOptions) {
+    this.container = options.container;
+    this.onStateChanged = options.onStateChanged;
+    this.getPerformanceMetrics = options.getPerformanceMetrics;
+    this.toggle2DFallback = options.toggle2DFallback;
+    this.is2DMode = options.is2DMode;
 
     this.render();
   }
@@ -39,6 +55,9 @@ export class StudioBar {
     const simDay = storage.getSimulatedDay() || dateGate.getActiveDay();
     const soundOn = storage.getSoundEnabled();
     const currentQuality = storage.getQualityLevel();
+
+    const is2DActive = this.is2DMode ? this.is2DMode() : false;
+    const metrics = this.getPerformanceMetrics ? this.getPerformanceMetrics() : null;
 
     this.barEl.innerHTML = `
       <div class="studio-header">
@@ -109,6 +128,47 @@ export class StudioBar {
           </label>
         </div>
 
+        <!-- Accessible 2D Fallback Toggle -->
+        <div class="studio-control-group toggle-group">
+          <label class="studio-toggle-label" for="toggle2DFallback">
+            <input type="checkbox" id="toggle2DFallback" ${is2DActive ? 'checked' : ''} />
+            <span class="toggle-switch"></span>
+            <span class="toggle-text">♿ 2D Fallback Mode (WebGL Off)</span>
+          </label>
+        </div>
+
+        <!-- Live Performance Profiler & Budget HUD -->
+        ${metrics ? `
+          <div class="studio-control-group perf-hud-group">
+            <div class="perf-hud-header">
+              <label class="studio-label"><strong>Performance & Frame Budget:</strong></label>
+              <span class="perf-badge badge-${metrics.budgetStatus}">${metrics.budgetStatus.toUpperCase()}</span>
+            </div>
+            <div class="studio-perf-hud" id="studioPerfHud">
+              <div class="perf-row">
+                <span>FPS:</span>
+                <strong id="hudFps">${metrics.fps} FPS</strong>
+              </div>
+              <div class="perf-row">
+                <span>Frame Time:</span>
+                <strong id="hudFrame">${metrics.frameTimeMs} ms <small>(budget: ${metrics.targetFrameBudgetMs}ms)</small></strong>
+              </div>
+              <div class="perf-row">
+                <span>Draw Calls:</span>
+                <strong id="hudCalls">${metrics.drawCalls}</strong>
+              </div>
+              <div class="perf-row">
+                <span>Triangles:</span>
+                <strong id="hudTris">${metrics.triangles.toLocaleString()}</strong>
+              </div>
+              <div class="perf-row">
+                <span>Mode / Tier:</span>
+                <strong id="hudTier">${metrics.is2DFallback ? 'Accessible 2D' : metrics.quality.toUpperCase()}</strong>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
         <!-- Action Buttons -->
         <div class="studio-action-row">
           <button type="button" class="studio-btn btn-reset" id="btnResetStorage">
@@ -123,6 +183,11 @@ export class StudioBar {
 
     document.getElementById('btnToggleStudio')?.addEventListener('click', () => {
       this.isExpanded = !this.isExpanded;
+      if (this.isExpanded) {
+        this.startHudInterval();
+      } else {
+        this.stopHudInterval();
+      }
       this.renderContent();
     });
 
@@ -162,6 +227,14 @@ export class StudioBar {
       if (input.checked) soundManager.playBell(520);
     });
 
+    document.getElementById('toggle2DFallback')?.addEventListener('change', () => {
+      soundManager.playClick();
+      if (this.toggle2DFallback) {
+        this.toggle2DFallback();
+        this.renderContent();
+      }
+    });
+
     document.getElementById('btnResetStorage')?.addEventListener('click', () => {
       if (confirm('Reset Advent Calendar progress and simulation?')) {
         storage.resetAll();
@@ -174,5 +247,37 @@ export class StudioBar {
       document.body.classList.toggle('embed-mode-active');
       soundManager.playClick();
     });
+  }
+
+  private startHudInterval(): void {
+    this.stopHudInterval();
+    if (!this.getPerformanceMetrics) return;
+
+    this.hudIntervalId = window.setInterval(() => {
+      if (!this.isExpanded || !this.getPerformanceMetrics) return;
+      const metrics = this.getPerformanceMetrics();
+      const elFps = document.getElementById('hudFps');
+      const elFrame = document.getElementById('hudFrame');
+      const elCalls = document.getElementById('hudCalls');
+      const elTris = document.getElementById('hudTris');
+      const elTier = document.getElementById('hudTier');
+
+      if (elFps) elFps.textContent = `${metrics.fps} FPS`;
+      if (elFrame) elFrame.innerHTML = `${metrics.frameTimeMs} ms <small>(budget: ${metrics.targetFrameBudgetMs}ms)</small>`;
+      if (elCalls) elCalls.textContent = `${metrics.drawCalls}`;
+      if (elTris) elTris.textContent = metrics.triangles.toLocaleString();
+      if (elTier) elTier.textContent = metrics.is2DFallback ? 'Accessible 2D' : metrics.quality.toUpperCase();
+    }, 800);
+  }
+
+  private stopHudInterval(): void {
+    if (this.hudIntervalId !== null) {
+      clearInterval(this.hudIntervalId);
+      this.hudIntervalId = null;
+    }
+  }
+
+  public destroy(): void {
+    this.stopHudInterval();
   }
 }
