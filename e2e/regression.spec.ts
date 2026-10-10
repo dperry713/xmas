@@ -149,4 +149,94 @@ test.describe('Advent Piazza Production Regression Suite', () => {
     await modal.locator('#btnModalClose').click();
     await expect(modal).not.toHaveClass(/is-open/);
   });
+
+  test('7. Day-by-day progression: completing Day 1 unlocks Day 2 and advances sequentially', async ({ page }) => {
+    // Open Calendar Drawer and verify Day 2 is initially locked
+    await page.click('#btnOpenCalendar');
+    const drawer = page.locator('#calendarDrawerOverlay');
+    const day2Card = drawer.locator('.drawer-card[data-day="2"]');
+    await expect(day2Card).toHaveClass(/card--locked/);
+    await expect(day2Card.locator('.card-open-btn')).toBeDisabled();
+
+    // Open Day 1
+    await drawer.locator('.card-open-btn[data-day="1"]').click();
+    const modal = page.locator('#dayModalOverlay');
+    await expect(modal).toHaveClass(/is-open/);
+
+    // Verify Next Day button is initially disabled
+    const btnNext = modal.locator('#btnNextDay');
+    await expect(btnNext).toBeDisabled();
+
+    // Complete Day 1
+    await modal.locator('#btnToggleComplete').click();
+    await expect(modal.locator('#btnToggleComplete')).toContainText('Moment Completed');
+
+    // Next Day button must now be enabled!
+    await expect(btnNext).toBeEnabled();
+
+    // Click Next Day button to advance to Day 2!
+    await btnNext.click();
+    await expect(modal.locator('.badge-num')).toContainText('Day 2');
+    await expect(modal.locator('.modal-theme-title')).toContainText('Warmth from the Hearth');
+
+    // Complete Day 2
+    await modal.locator('#btnToggleComplete').click();
+    await expect(modal.locator('#btnToggleComplete')).toContainText('Moment Completed');
+
+    // Close modal
+    await modal.locator('#btnModalClose').click();
+
+    // Header must show 2 of 24
+    await expect(page.locator('#progressCountText')).toContainText('2 of 24');
+
+    // Open Calendar Drawer and verify Day 3 is now unlocked!
+    await page.click('#btnOpenCalendar');
+    const day3Card = drawer.locator('.drawer-card[data-day="3"]');
+    await expect(day3Card).toHaveClass(/card--available/);
+    await expect(day3Card.locator('.card-open-btn')).toBeEnabled();
+  });
+
+  test('8. Restart progress: resets progress cleanly from header and calendar drawer', async ({ page }) => {
+    // Complete Day 1
+    await page.click('#btnOpenCalendar');
+    await page.click('.card-open-btn[data-day="1"]');
+    const modal = page.locator('#dayModalOverlay');
+    await modal.locator('#btnToggleComplete').click();
+    await modal.locator('#btnModalClose').click();
+
+    // Header shows 1 of 24, and Restart button is visible
+    await expect(page.locator('#progressCountText')).toContainText('1 of 24');
+    const headerResetBtn = page.locator('#btnHeaderReset');
+    await expect(headerResetBtn).toBeVisible();
+
+    // Click Restart in header
+    await headerResetBtn.click();
+
+    // Header resets back to 0 of 24, and Restart button hides
+    await expect(page.locator('#progressCountText')).toContainText('0 of 24');
+    await expect(headerResetBtn).not.toBeVisible();
+
+    // Check calendar drawer: Day 1 available, Day 2 locked
+    await page.click('#btnOpenCalendar');
+    const drawer = page.locator('#calendarDrawerOverlay');
+    const day1Card = drawer.locator('.drawer-card[data-day="1"]');
+    const day2Card = drawer.locator('.drawer-card[data-day="2"]');
+    await expect(day1Card).toHaveClass(/card--available/);
+    await expect(day2Card).toHaveClass(/card--locked/);
+
+    // Open Day 1 and complete it again
+    await day1Card.locator('.card-open-btn').click();
+    await modal.locator('#btnToggleComplete').click();
+    await modal.locator('#btnModalClose').click();
+
+    // Open Calendar Drawer and click Restart button in drawer
+    await page.click('#btnOpenCalendar');
+    const drawerResetBtn = drawer.locator('#btnDrawerReset');
+    await expect(drawerResetBtn).toBeVisible();
+    await drawerResetBtn.click();
+
+    // Progress resets back to 0 of 24
+    await expect(drawer.locator('.drawer-subtitle')).toContainText('0 of 24');
+    await expect(drawer.locator('.drawer-card[data-day="2"]')).toHaveClass(/card--locked/);
+  });
 });

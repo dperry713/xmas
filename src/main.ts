@@ -42,8 +42,7 @@ export class AdventApp {
     this.dayModal = new DayModal({
       container: appContainer,
       onCompletedChanged: (_day: number) => {
-        this.piazzaScene.updateAtmosphere();
-        this.updateHeader();
+        this.updateAllComponents();
       },
       onNavigateDay: (day: number) => {
         this.piazzaScene.focusOnDay(day);
@@ -56,6 +55,9 @@ export class AdventApp {
       onSelectDay: (day: number) => {
         this.piazzaScene.focusOnDay(day);
         this.dayModal.open(day);
+      },
+      onResetProgress: () => {
+        this.restartProgress();
       }
     });
 
@@ -82,11 +84,9 @@ export class AdventApp {
     // 5. Bind Header Controls
     this.bindHeaderControls();
 
-    // 6. Subscribe to storage changes
+    // 6. Subscribe to storage changes for reactive multi-component synchronization
     storage.subscribe(() => {
-      this.updateHeader();
-      this.piazzaScene.updateAtmosphere();
-      this.piazzaScene.applyCurrentQuality();
+      this.updateAllComponents();
     });
 
     // 7. Initial UI sync
@@ -112,6 +112,11 @@ export class AdventApp {
     // Calendar Drawer button
     document.getElementById('btnOpenCalendar')?.addEventListener('click', () => {
       this.calendarDrawer.toggle();
+    });
+
+    // Header Restart button
+    document.getElementById('btnHeaderReset')?.addEventListener('click', () => {
+      this.restartProgress();
     });
 
     // Audio Mute/Unmute button
@@ -163,6 +168,13 @@ export class AdventApp {
     if (calendarBtnText) {
       calendarBtnText.textContent = t('openCalendar', lang);
     }
+
+    const resetBtn = document.getElementById('btnHeaderReset');
+    const resetBtnText = document.getElementById('btnHeaderResetText');
+    if (resetBtn && resetBtnText) {
+      resetBtnText.textContent = t('restart', lang);
+      resetBtn.style.display = completed.length > 0 ? 'inline-flex' : 'none';
+    }
   }
 
   public updateAllComponents(): void {
@@ -170,7 +182,21 @@ export class AdventApp {
     this.updateAudioIcons();
     this.piazzaScene.updateAtmosphere();
     this.piazzaScene.applyCurrentQuality();
-    this.studioBar.renderContent();
+    if (this.calendarDrawer) {
+      this.calendarDrawer.renderContent();
+    }
+    if (this.dayModal && this.dayModal.isOpen) {
+      this.dayModal.refresh();
+    }
+    if (this.studioBar) {
+      this.studioBar.renderContent();
+    }
+  }
+
+  public restartProgress(): void {
+    storage.resetAll();
+    soundManager.playCelebrationSparkle();
+    this.updateAllComponents();
   }
 
   /**

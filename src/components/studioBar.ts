@@ -236,11 +236,9 @@ export class StudioBar {
     });
 
     document.getElementById('btnResetStorage')?.addEventListener('click', () => {
-      if (confirm('Reset Advent Calendar progress and simulation?')) {
-        storage.resetAll();
-        soundManager.playClick();
-        this.onStateChanged();
-      }
+      storage.resetAll();
+      soundManager.playClick();
+      this.onStateChanged();
     });
 
     document.getElementById('btnToggleEmbed')?.addEventListener('click', () => {

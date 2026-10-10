@@ -17,25 +17,32 @@ class DateGateService {
       return 24;
     }
 
-    // 2. Studio override: Specific simulated day
+    // 2. Base unlocked day from calendar date or simulation
+    let baseDay = 1;
     const simDay = storage.getSimulatedDay();
     if (simDay !== null && simDay !== undefined) {
-      return Math.min(24, Math.max(1, simDay));
+      baseDay = Math.min(24, Math.max(1, simDay));
+    } else {
+      const now = new Date();
+      const month = now.getMonth(); // 11 is December
+      const date = now.getDate();
+
+      if (month === 11) {
+        // It is December!
+        baseDay = Math.min(24, Math.max(1, date));
+      }
     }
 
-    // 3. Real calendar date
-    const now = new Date();
-    const month = now.getMonth(); // 11 is December
-    const date = now.getDate();
-
-    if (month === 11) {
-      // It is December!
-      return Math.min(24, Math.max(1, date));
+    // 3. Day-by-day progressive advancement:
+    // Completing days unlocks the next sequential day in the journey
+    const completed = storage.getCompletedDays();
+    if (completed.length > 0) {
+      const maxCompleted = Math.max(...completed);
+      const nextProgressiveDay = Math.min(24, maxCompleted + 1);
+      return Math.max(baseDay, nextProgressiveDay);
     }
 
-    // If outside December (e.g. testing in other months),
-    // default to day 1 unlocked for interactive exploration
-    return 1;
+    return baseDay;
   }
 
   /**

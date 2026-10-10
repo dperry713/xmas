@@ -76,6 +76,45 @@ describe('Date Gating Engine', () => {
     storage.markDayCompleted(1);
     expect(dateGate.getDayStatus(1)).toBe('completed');
   });
+
+  it('should advance day-by-day progression sequentially as days are completed', () => {
+    storage.resetAll();
+    // Initially outside December: Day 1 is available, Day 2 is locked
+    expect(dateGate.isDayUnlocked(1)).toBe(true);
+    expect(dateGate.isDayUnlocked(2)).toBe(false);
+
+    // Complete Day 1 -> Day 2 advances and unlocks!
+    storage.markDayCompleted(1);
+    expect(dateGate.isDayUnlocked(2)).toBe(true);
+    expect(dateGate.isDayUnlocked(3)).toBe(false);
+    expect(dateGate.getDayStatus(1)).toBe('completed');
+    expect(dateGate.getDayStatus(2)).toBe('available');
+
+    // Complete Day 2 -> Day 3 advances and unlocks!
+    storage.markDayCompleted(2);
+    expect(dateGate.isDayUnlocked(3)).toBe(true);
+    expect(dateGate.isDayUnlocked(4)).toBe(false);
+    expect(dateGate.getDayStatus(2)).toBe('completed');
+    expect(dateGate.getDayStatus(3)).toBe('available');
+  });
+
+  it('should reset progress cleanly back to Day 1 when restart is triggered', () => {
+    storage.markDayCompleted(1);
+    storage.markDayCompleted(2);
+    storage.markDayCompleted(3);
+    expect(storage.getCompletedDays()).toEqual([1, 2, 3]);
+    expect(dateGate.isDayUnlocked(4)).toBe(true);
+
+    // Trigger restart
+    storage.resetAll();
+    expect(storage.getCompletedDays()).toEqual([]);
+    expect(storage.getVisitedDays()).toEqual([]);
+    expect(dateGate.isDayUnlocked(1)).toBe(true);
+    expect(dateGate.isDayUnlocked(2)).toBe(false);
+    expect(dateGate.isDayUnlocked(3)).toBe(false);
+    expect(dateGate.isDayUnlocked(4)).toBe(false);
+    expect(dateGate.getDayStatus(1)).toBe('available');
+  });
 });
 
 describe('Storage Service & Adaptive Quality Preferences', () => {

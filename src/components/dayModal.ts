@@ -126,6 +126,14 @@ export class DayModal {
     }
   }
 
+  public refresh(): void {
+    if (!this.isOpen || !this.currentDay) return;
+    const data = ADVENT_DAYS.find(d => d.day === this.currentDay);
+    if (data) {
+      this.renderContent(data);
+    }
+  }
+
   navigate(direction: number): void {
     if (!this.currentDay) return;
     const targetDay = this.currentDay + direction;

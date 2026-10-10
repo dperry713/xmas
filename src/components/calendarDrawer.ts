@@ -13,12 +13,22 @@ import { soundManager } from '../audio/soundManager';
 export class CalendarDrawer {
   private container: HTMLElement;
   private onSelectDay: (day: number) => void;
+  private onResetProgress?: () => void;
   public isOpen: boolean = false;
   private drawerEl!: HTMLDivElement;
 
-  constructor({ container, onSelectDay }: { container: HTMLElement; onSelectDay: (day: number) => void }) {
+  constructor({
+    container,
+    onSelectDay,
+    onResetProgress
+  }: {
+    container: HTMLElement;
+    onSelectDay: (day: number) => void;
+    onResetProgress?: () => void;
+  }) {
     this.container = container;
     this.onSelectDay = onSelectDay;
+    this.onResetProgress = onResetProgress;
 
     this.render();
   }
@@ -114,7 +124,21 @@ export class CalendarDrawer {
         <header class="drawer-header">
           <div class="drawer-title-group">
             <h2 class="drawer-title">${t('drawerTitle', lang)}</h2>
-            <p class="drawer-subtitle">${completedDays.length} ${t('of24', lang)}</p>
+            <div class="drawer-progress-actions">
+              <p class="drawer-subtitle">${completedDays.length} ${t('of24', lang)}</p>
+              ${completedDays.length > 0 ? `
+                <button 
+                  type="button" 
+                  class="drawer-reset-btn" 
+                  id="btnDrawerReset" 
+                  aria-label="${t('resetStorage', lang)}"
+                  title="${t('resetStorage', lang)}"
+                >
+                  <span class="drawer-reset-icon" aria-hidden="true">🔄</span>
+                  <span>${t('resetStorage', lang)}</span>
+                </button>
+              ` : ''}
+            </div>
           </div>
           <button type="button" class="drawer-close-btn" id="btnDrawerClose" aria-label="${t('closeCalendar', lang)}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -167,6 +191,16 @@ export class CalendarDrawer {
 
     document.getElementById('btnDrawerClose')?.addEventListener('click', () => {
       this.close();
+    });
+
+    document.getElementById('btnDrawerReset')?.addEventListener('click', () => {
+      soundManager.playClick();
+      if (this.onResetProgress) {
+        this.onResetProgress();
+      } else {
+        storage.resetAll();
+      }
+      this.renderContent();
     });
 
     this.drawerEl.querySelectorAll('.card-open-btn:not([disabled])').forEach((btnEl) => {

@@ -224,6 +224,10 @@ export class StorageService {
     return (this.memoryStore.visitedDays || []).includes(day);
   }
 
+  getVisitedDays(): number[] {
+    return [...(this.memoryStore.visitedDays || [])];
+  }
+
   getSoundEnabled(): boolean {
     return this.memoryStore.soundEnabled !== false;
   }
@@ -278,11 +282,20 @@ export class StorageService {
   }
 
   resetAll(): void {
+    const lang = this.getLanguage();
     this.memoryStore = {
       ...DEFAULT_STORAGE_STATE,
-      lang: this.getLanguage()
+      lang
     };
-    this.save();
+    const ls = this.getStorage();
+    if (ls) {
+      try {
+        ls.setItem(STORAGE_KEY_V2, JSON.stringify(this.memoryStore));
+        ls.removeItem(STORAGE_KEY_V1);
+      } catch (e) {
+        console.warn('Could not write to localStorage during reset:', e);
+      }
+    }
     this.notify();
   }
 
